@@ -94,3 +94,7 @@ pnpm dsh web
 [MIT](LICENSE)
 
 第三方依赖及其许可证见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+## QZOS 界面开发
+
+本私有仓库的首轮用户界面位于 [QZOS UI 插件](packages/client/ui-qzos/README.zh.md)，包含工作台、知识库、数字员工、连接器、技能、模板和成果。当前仅使用模拟数据，业务接入另行推进；开发分支为 `feature/dsh-ui`，集成主线为 `develop`。

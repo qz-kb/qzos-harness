@@ -1,0 +1,40 @@
+/** QZOS global panels; upstream Sessions and their navigation stay independent. */
+import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-client-locale/client'
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
+import { Brand, PanelIcon, QzosPanel } from './Panel.tsx'
+import { createQzosStore } from './store.ts'
+import { panels, type Panel } from './catalog.ts'
+import { en, zh, type QzosKey } from './locales.ts'
+
+declare module '@deepseek-ai/dsh-client-ui-slots' {
+  interface LocaleNamespaceMap {
+    /** QZOS workbench and synthetic resource catalog copy. */
+    qzos: QzosKey
+  }
+}
+/** Only presentation services are injected; no business or model transport. */
+export const inject = ['slots', 'locale', 'layout']
+
+/** Register removable QZOS UI contributions.
+ * @param ctx - Browser plugin context.
+ */
+export function apply(ctx: Context): void {
+  ctx.effect(() => ctx.locale.register('qzos', { zh, en }), 'qzos dictionaries')
+  const t = ctx.locale.bind('qzos')
+  const store = createQzosStore()
+  const navigate = (panel: Panel) => ctx.layout.selectPanel(`qzos-${panel}` as MainPanelId)
+  const developer = window.sessionStorage.getItem('qzos.preview') === '1'
+  ctx.slots.inject('sidebar.brand.name', () => ctx.slots.register({ name: 'sidebar.brand.name', locale: 'qzos' }, Brand))
+  for (const [order, panel] of panels.entries()) {
+    const id = `qzos-${panel}` as MainPanelId
+    ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: id, locale: 'qzos', store, inject: () => ({ panel, navigate, developer }) }, QzosPanel))
+    ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id, order: order - 100, label: () => t(panel), inject: () => ({ panel }) }, PanelIcon))
+  }
+  ctx.slots.inject('main', () => {
+    navigate('home')
+    return () => { ctx.layout.selectPanel('conversation' as MainPanelId) }
+  })
+}

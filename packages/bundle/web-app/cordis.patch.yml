@@ -584,3 +584,8 @@
       name: '@deepseek-ai/dsh-agent-preset-registry'
       config:
         default: standard
+
+# QZOS browser-only workbench. Remove this row to restore the upstream shell.
+- insert:
+    - id: ui-qzos
+      name: '@deepseek-ai/dsh-client-ui-qzos'

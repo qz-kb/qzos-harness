@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/client/ui-qzos/README.md
+/qzos-workspace-preview:
+  en: 494818a7abfac371
+  zh: 6b91ac8c54fe6a4d
+/qzos-workspace-preview/use-this-package:
+  en: fae25c54d42e7d4c
+  zh: 05febc0170234dbb
+/qzos-workspace-preview/model-experience:
+  en: 7760fb448f9a5906
+  zh: cd3afdd931e0dda4
+/qzos-workspace-preview/known-limitations-and-deferred-work:
+  en: dd834f90918ef264
+  zh: 7e9a166974687e20

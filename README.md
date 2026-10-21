@@ -75,3 +75,7 @@ For agents, follow [AGENTS.md](AGENTS.md).
 [MIT](LICENSE)
 
 Third-party dependencies and their licenses are disclosed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## QZOS UI development
+
+This private repository adds a [QZOS UI plugin](packages/client/ui-qzos/README.md) with a workbench, knowledge, digital employees, connectors, skills, templates and deliverables. This first slice uses synthetic data; business integration follows separately. Develop on `feature/dsh-ui` and integrate on `develop`.
