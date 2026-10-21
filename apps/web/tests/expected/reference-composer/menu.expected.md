@@ -1,6 +1,9 @@
 - listbox "Trigger suggestions":
+  - text: Digital employees
+  - option "知识助手 Demo data · Business disconnected" [selected]
+  - option "内容编辑 Demo data · Business disconnected"
   - text: Files & folders
-  - option "folderx/ Browse folder" [selected]:
+  - option "folderx/ Browse folder":
     - text: folderx/
     - button "Browse folder"
   - option "reference.txt"

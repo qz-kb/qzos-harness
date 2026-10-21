@@ -1,5 +1,5 @@
 /** QZOS preview panels, composed inside the existing DSH main seat. */
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Button, Input, Tag, ReferenceIconRegular, IconSparkleRegular, IconUsersOutlineRegular, IconFolderOpenOutlineRegular, IconLinkOutlineRegular, IconQueueOutlineRegular, IconBrowseOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsStore, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { createQzosStore } from './store.ts'
@@ -8,7 +8,12 @@ import css from './Panel.module.css'
 
 type Copy = PropsLocale<'qzos'>
 type View = PropsStore<ReturnType<typeof createQzosStore>>
-export type PanelProps = Copy & View & { panel: Panel; navigate: (panel: Panel) => void; developer: boolean }
+export type PanelProps = Copy & View & {
+  panel: Panel
+  navigate: (panel: Panel) => void
+  developer: boolean
+  openEmployee: (id: string) => Promise<string | undefined>
+}
 const icons = {
   home: IconSparkleRegular, knowledge: IconFolderOpenOutlineRegular, employees: IconUsersOutlineRegular,
   connectors: IconLinkOutlineRegular, skills: IconSparkleRegular, templates: IconQueueOutlineRegular, outputs: IconBrowseOutlineRegular,
@@ -27,7 +32,15 @@ export function NativePanelIcon({ size }: PropsRuntime<'sidebar.panellist'>) {
 export function Brand({ t }: Copy) { return <strong className={css.brand}>{t('brand')}</strong> }
 
 /** Render one global panel using the shared demo store and local selection state. */
-export function QzosPanel({ panel, navigate, developer, t, useStore, actions }: PanelProps) {
+export function QzosPanel({ panel, navigate, developer, openEmployee, t, useStore, actions }: PanelProps) {
+  const [openingEmployee, setOpeningEmployee] = useState(false)
+  const [employeeError, setEmployeeError] = useState<string>()
+  const enterEmployee = async (id: string) => {
+    setOpeningEmployee(true)
+    setEmployeeError(undefined)
+    try { setEmployeeError(await openEmployee(id)) }
+    finally { setOpeningEmployee(false) }
+  }
   const draft = useStore(s => s.draft)
   const employee = useStore(s => s.employee)
   const knowledge = useStore(s => s.knowledge)
@@ -58,6 +71,7 @@ export function QzosPanel({ panel, navigate, developer, t, useStore, actions }: 
       <Tag>{t('demo')}</Tag>
     </header>
     <div className={css.scroll}>
+      {employeeError && <p role="alert">{employeeError}</p>}
       {panel === 'home' ? <div className={css.home}>
         <div className={css.intro}><span className={css.eyebrow}>{t('home')}</span><h1>{t('welcome')}</h1><p>{t('subtitle')}</p></div>
         <div className={css.context}>
@@ -91,7 +105,7 @@ export function QzosPanel({ panel, navigate, developer, t, useStore, actions }: 
             <div className={css.sectionHeading}><Tag>{detail.category}</Tag><Tag>{t(detail.status)}</Tag></div>
             <h2>{detail.title}</h2><p>{detail.description}</p><h3>{t('includes')}</h3><pre>{detail.content}</pre>
             <div className={css.actions}>
-              {panel === 'employees' && <Button variant="primary" disabled={detail.status !== 'ready'} onClick={() => { actions.choose('employee', detail.id); navigate('home') }}>{t('use')}</Button>}
+              {panel === 'employees' && <Button variant="primary" disabled={detail.status !== 'ready' || openingEmployee} onClick={() => { void enterEmployee(detail.id) }}>{t('use')}</Button>}
               {panel === 'knowledge' && <Button variant="primary" disabled={detail.status !== 'ready'} onClick={() => { actions.choose('knowledge', detail.id); navigate('home') }}>{t('select')}</Button>}
               {panel === 'templates' && <Button variant="primary" onClick={() => { actions.setDraft(detail.content); navigate('home') }}>{t('useTemplate')}</Button>}
               {panel === 'outputs' && <Button onClick={() => { actions.open('demo-weekly'); navigate('home') }}>{t('origin')}</Button>}
@@ -101,7 +115,7 @@ export function QzosPanel({ panel, navigate, developer, t, useStore, actions }: 
         </> : <>
           <div className={css.toolbar}><Input aria-label={t('search')} placeholder={t('search')} value={query} onChange={event => actions.setQuery(panel, event.target.value)} /><div className={css.filters}><Button aria-pressed={!available} variant={!available ? 'outline' : 'ghost'} onClick={() => actions.setFilter(panel, false)}>{t('all')}</Button><Button aria-pressed={available} variant={available ? 'outline' : 'ghost'} onClick={() => actions.setFilter(panel, true)}>{t('available')}</Button></div></div>
           {previewState === 'loading' ? <div className={css.empty} role="status">{t('loadingHint')}</div> : previewState === 'error' ? <div className={css.empty} role="alert"><p>{t('errorHint')}</p><Button onClick={() => actions.setPreview('normal')}>{t('reset')}</Button></div> : (previewState === 'empty' || filtered.length === 0) ? <div className={css.empty}><p>{t('empty')}</p><Button onClick={() => { actions.setQuery(panel, ''); actions.setFilter(panel, false); actions.setPreview('normal') }}>{t('clear')}</Button></div> : <div className={css.grid}>{filtered.map((item) => { const Icon = icons[panel]; return <article className={css.card} key={item.id}>
-            <div className={css.cardTop}><span className={css.icon}><Icon size={24} /></span><Tag>{t(item.status)}</Tag></div><h2>{item.title}</h2><p>{item.description}</p><div className={css.cardFooter}><small>{item.category}</small><Button variant="outline" onClick={() => actions.setDetail(panel, item.id)} aria-label={`${t('detail')} · ${item.title}`}>{t('detail')}</Button></div>
+            <div className={css.cardTop}><span className={css.icon}><Icon size={24} /></span><Tag>{t(item.status)}</Tag></div><h2>{item.title}</h2><p>{item.description}</p><div className={css.cardFooter}><small>{item.category}</small>{panel === 'employees' && <Button disabled={item.status !== 'ready' || openingEmployee} onClick={() => { void enterEmployee(item.id) }} aria-label={`${t('use')} · ${item.title}`}>{t('use')}</Button>}<Button variant="outline" onClick={() => actions.setDetail(panel, item.id)} aria-label={`${t('detail')} · ${item.title}`}>{t('detail')}</Button></div>
           </article> })}</div>}
         </>}
       </div>}

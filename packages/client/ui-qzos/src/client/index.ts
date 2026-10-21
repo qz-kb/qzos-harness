@@ -8,6 +8,7 @@ import { Brand, NativePanelIcon, PanelIcon, QzosPanel } from './Panel.tsx'
 import { createQzosStore } from './store.ts'
 import { panels, type Panel } from './catalog.ts'
 import { en, zh, type QzosKey } from './locales.ts'
+import { installEmployeeMentions } from './employees.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -15,8 +16,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     qzos: QzosKey
   }
 }
-/** Only presentation services are injected; no business or model transport. */
-export const inject = ['slots', 'locale', 'layout']
+/** Native presentation and draft services; no employee business transport. */
+export const inject = ['slots', 'locale', 'layout', 'sessions', 'workspaces', 'conversation', 'inputTriggers', 'uiWorkspace']
 
 /** Register removable QZOS UI contributions.
  * @param ctx - Browser plugin context.
@@ -25,6 +26,7 @@ export function apply(ctx: Context): void {
   ctx.effect(() => ctx.locale.register('qzos', { zh, en }), 'qzos dictionaries')
   const t = ctx.locale.bind('qzos')
   const store = createQzosStore()
+  const openEmployee = installEmployeeMentions(ctx, t)
   const navigate = (panel: Panel) => ctx.layout.selectPanel(`qzos-${panel}` as MainPanelId)
   const developer = window.sessionStorage.getItem('qzos.preview') === '1'
   ctx.slots.inject('sidebar.brand.name', () => ctx.slots.register({ name: 'sidebar.brand.name', locale: 'qzos' }, Brand))
@@ -33,7 +35,7 @@ export function apply(ctx: Context): void {
   }, NativePanelIcon))
   for (const [order, panel] of panels.entries()) {
     const id = `qzos-${panel}` as MainPanelId
-    ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: id, locale: 'qzos', store, inject: () => ({ panel, navigate, developer }) }, QzosPanel))
+    ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: id, locale: 'qzos', store, inject: () => ({ panel, navigate, developer, openEmployee }) }, QzosPanel))
     ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id, order: order - 100, label: () => t(panel), inject: () => ({ panel }) }, PanelIcon))
   }
   ctx.slots.inject('main', () => {
