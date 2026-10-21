@@ -1,13 +1,14 @@
 /** QZOS synthetic flows inside the shipped Web composition. */
 import { fileURLToPath } from 'node:url'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
 import { chromium } from 'playwright'
 import { expect, it } from 'vitest'
-import { launchWebScaffold, watchConsole } from './scaffold.ts'
+import { launchWebScaffold, seedSession, watchConsole } from './scaffold.ts'
 
 it('browses QZOS catalogs and keeps demo drafts and employee ownership isolated', async () => {
   const scaffold = await launchWebScaffold({ extraOverlayPath: fileURLToPath(new URL('./pin-browse-picker.overlay.yml', import.meta.url)) })
   try {
+    await seedSession(scaffold, await readFile(new URL('../../../snapshots/web/seeded-history/session.v3.jsonl', import.meta.url), 'utf8'), 'qzos-native-window')
     const browser = await chromium.launch()
     try {
       const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, locale: 'zh-CN' })
@@ -15,8 +16,25 @@ it('browses QZOS catalogs and keeps demo drafts and employee ownership isolated'
       await page.addInitScript(() => { window.sessionStorage.setItem('qzos.preview', '1') })
       await page.goto(scaffold.authenticatedUrl)
       const panel = page.locator('[data-qzos-panel]')
-      await page.locator('[data-qzos-panel="home"]').waitFor()
       const navigate = async (name: string) => { await page.getByRole('navigation').getByRole('button', { name, exact: true }).click() }
+      const native = page.getByRole('navigation').getByRole('button', { name: '工作窗口', exact: true })
+      await native.waitFor()
+      expect(await native.getAttribute('aria-current')).toBe('page')
+      expect(await panel.count()).toBe(0)
+      await page.locator('[role="treeitem"]').first().click()
+      await page.locator('[role="treeitem"]').nth(1).click()
+      const nativeInput = page.locator('[data-composer-input][contenteditable="true"]').first()
+      await page.getByText('DONE', { exact: true }).waitFor()
+      await nativeInput.fill('原始工作窗口的未发送草稿')
+      await expect.poll(() => nativeInput.innerText()).toContain('原始工作窗口的未发送草稿')
+      await navigate('知识库')
+      await navigate('工作窗口')
+      await expect.poll(() => nativeInput.innerText()).toContain('原始工作窗口的未发送草稿')
+      if (process.env.QZOS_UI_SCREENSHOTS) {
+        await mkdir(process.env.QZOS_UI_SCREENSHOTS, { recursive: true })
+        await page.screenshot({ path: `${process.env.QZOS_UI_SCREENSHOTS}/qzos-native-window.png` })
+      }
+      await navigate('工作台')
       expect(await panel.getByText('演示数据 · 未连接业务', { exact: true }).count()).toBeGreaterThan(0)
       await panel.getByRole('textbox', { name: '今天想完成什么？' }).fill('保留我的模拟草稿')
       for (const name of ['知识库', '数字员工', '连接器', '技能', '模板', '成果']) {
@@ -71,8 +89,9 @@ it('browses QZOS catalogs and keeps demo drafts and employee ownership isolated'
       await panel.getByRole('button', { name: '返回关联对话' }).click()
       await panel.getByRole('heading', { name: '整理团队一周工作总结', exact: true }).waitFor()
       const labels = await page.getByRole('navigation').getByRole('button').allTextContents()
-      expect(labels.slice(0, 7)).toMatchInlineSnapshot(`
+      expect(labels.slice(0, 8)).toMatchInlineSnapshot(`
         [
+          "工作窗口",
           "工作台",
           "知识库",
           "数字员工",
@@ -108,6 +127,7 @@ it('browses QZOS catalogs and keeps demo drafts and employee ownership isolated'
       await panel.waitFor({ state: 'detached' })
       expect(await page.getByRole('navigation').getByRole('button', { name: '知识库', exact: true }).count()).toBe(0)
       await scaffold.ctx.loader.create({ name: '@deepseek-ai/dsh-client-ui-qzos' })
+      await navigate('工作台')
       await page.locator('[data-qzos-panel="home"]').waitFor()
       expect(await panel.getByRole('textbox', { name: '今天想完成什么？' }).inputValue()).toBe('')
     } finally { await browser.close() }

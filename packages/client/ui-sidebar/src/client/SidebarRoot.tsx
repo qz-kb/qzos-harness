@@ -57,7 +57,7 @@ type PanelRowProps =
 
 /** Each panel row subscribes only to its own selection state. */
 function PanelRow({ id, label, wide, usePanelInfo, selectPanel, renderSlot }: PanelRowProps) {
-  const active = usePanelInfo(info => info.activePanelId === id)
+  const active = usePanelInfo(info => (info.activePanelId ?? 'conversation') === id)
   return (
     <Tooltip label={label} delayMs={500} disabled={wide}>
       <button

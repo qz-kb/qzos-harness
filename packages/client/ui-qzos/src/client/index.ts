@@ -4,7 +4,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
-import { Brand, PanelIcon, QzosPanel } from './Panel.tsx'
+import { Brand, NativePanelIcon, PanelIcon, QzosPanel } from './Panel.tsx'
 import { createQzosStore } from './store.ts'
 import { panels, type Panel } from './catalog.ts'
 import { en, zh, type QzosKey } from './locales.ts'
@@ -28,13 +28,17 @@ export function apply(ctx: Context): void {
   const navigate = (panel: Panel) => ctx.layout.selectPanel(`qzos-${panel}` as MainPanelId)
   const developer = window.sessionStorage.getItem('qzos.preview') === '1'
   ctx.slots.inject('sidebar.brand.name', () => ctx.slots.register({ name: 'sidebar.brand.name', locale: 'qzos' }, Brand))
+  ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
+    name: 'sidebar.panellist', id: 'conversation' as MainPanelId, order: -110, label: () => t('native'),
+  }, NativePanelIcon))
   for (const [order, panel] of panels.entries()) {
     const id = `qzos-${panel}` as MainPanelId
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: id, locale: 'qzos', store, inject: () => ({ panel, navigate, developer }) }, QzosPanel))
     ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id, order: order - 100, label: () => t(panel), inject: () => ({ panel }) }, PanelIcon))
   }
   ctx.slots.inject('main', () => {
-    navigate('home')
-    return () => { ctx.layout.selectPanel('conversation' as MainPanelId) }
+    return () => {
+      if (ctx.layout.panelInfo.getSnapshot().activePanelId?.startsWith('qzos-')) ctx.layout.selectPanel(null)
+    }
   })
 }

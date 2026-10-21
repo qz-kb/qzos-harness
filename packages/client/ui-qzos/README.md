@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-This private browser plugin adds a workbench, knowledge, digital employee, connector, skill, template and deliverable catalog to the existing DSH shell. It uses synthetic Chinese example content and localized interface controls. It does not replace the native Session engine or its workspace navigation.
+This private browser plugin adds a workbench, knowledge, digital employee, connector, skill, template and deliverable catalog to the existing DSH shell. It uses synthetic Chinese example content and localized interface controls. The native DSH work window remains the default landing view and the first sidebar entry. QZOS panels do not replace its Session engine, composer, tools, workspace navigation or right-side panes.
 
 ## Use this package
 

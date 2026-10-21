@@ -1,6 +1,6 @@
 /** Copy for the QZOS synthetic workspace; fixture content is owned separately. */
 export const zh = {
-  brand: 'QZOS', home: '工作台', knowledge: '知识库', employees: '数字员工', connectors: '连接器', skills: '技能', templates: '模板', outputs: '成果',
+  brand: 'QZOS', native: '工作窗口', home: '工作台', knowledge: '知识库', employees: '数字员工', connectors: '连接器', skills: '技能', templates: '模板', outputs: '成果',
   demo: '演示数据 · 未连接业务', welcome: '把想法交给你的数字团队', subtitle: '连接知识与工具，让每一项工作都有清晰的起点。',
   prompt: '今天想完成什么？', draft: '输入你的想法，或从下方模板开始…', send: '模拟发送', stop: '停止模拟', newChat: '新建模拟对话',
   recent: '最近对话', starter: '从一个好问题开始', resources: '你的工作资源', all: '全部', available: '可体验', search: '搜索名称或描述', empty: '没有匹配的内容', clear: '清除筛选',
@@ -15,7 +15,7 @@ export const zh = {
 } satisfies Record<string, string>
 export type QzosKey = keyof typeof zh
 export const en: Record<QzosKey, string> = {
-  brand: 'QZOS', home: 'Workbench', knowledge: 'Knowledge', employees: 'Digital employees', connectors: 'Connectors', skills: 'Skills', templates: 'Templates', outputs: 'Deliverables',
+  brand: 'QZOS', native: 'Work window', home: 'Workbench', knowledge: 'Knowledge', employees: 'Digital employees', connectors: 'Connectors', skills: 'Skills', templates: 'Templates', outputs: 'Deliverables',
   demo: 'Demo data · Business disconnected', welcome: 'Work with your digital team', subtitle: 'Bring knowledge and tools together. Give every task a clear starting point.',
   prompt: 'What would you like to do today?', draft: 'Describe an idea, or start with a template…', send: 'Simulate send', stop: 'Stop simulation', newChat: 'New demo conversation',
   recent: 'Recent conversations', starter: 'Start with a good question', resources: 'Your resources', all: 'All', available: 'Preview available', search: 'Search names or descriptions', empty: 'No matching items', clear: 'Clear filters',

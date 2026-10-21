@@ -1,6 +1,6 @@
 /** QZOS preview panels, composed inside the existing DSH main seat. */
 import { useEffect } from 'react'
-import { Button, Input, Tag, IconSparkleRegular, IconUsersOutlineRegular, IconFolderOpenOutlineRegular, IconLinkOutlineRegular, IconQueueOutlineRegular, IconBrowseOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, Input, Tag, ReferenceIconRegular, IconSparkleRegular, IconUsersOutlineRegular, IconFolderOpenOutlineRegular, IconLinkOutlineRegular, IconQueueOutlineRegular, IconBrowseOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsStore, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { createQzosStore } from './store.ts'
 import { catalogs, panels, type Panel } from './catalog.ts'
@@ -18,6 +18,10 @@ const icons = {
 export function PanelIcon({ panel, size }: PropsRuntime<'sidebar.panellist'> & { panel: Panel }) {
   const Icon = icons[panel]
   return <Icon size={size} />
+}
+/** Link to the existing DSH conversation without replacing its main renderer. */
+export function NativePanelIcon({ size }: PropsRuntime<'sidebar.panellist'>) {
+  return <ReferenceIconRegular kind="session" size={size} />
 }
 /** Render the QZOS brand without replacing sidebar behavior. */
 export function Brand({ t }: Copy) { return <strong className={css.brand}>{t('brand')}</strong> }

@@ -3,8 +3,8 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-qzos/README.md
 /qzos-workspace-preview:
-  en: 494818a7abfac371
-  zh: 6b91ac8c54fe6a4d
+  en: ff5e16b366eea901
+  zh: 9efc9332cc900804
 /qzos-workspace-preview/use-this-package:
   en: fae25c54d42e7d4c
   zh: 05febc0170234dbb
