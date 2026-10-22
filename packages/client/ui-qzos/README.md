@@ -1,19 +1,23 @@
-# QZOS workspace preview
+# QZOS resource page preview
 
 English | [中文](README.zh.md)
 
-This private browser plugin adds a workbench, knowledge, digital employee, connector, skill, template and deliverable catalog to the existing DSH shell. It uses synthetic Chinese example content and localized interface controls. The native DSH work window remains the default landing view and the first sidebar entry. QZOS panels do not replace its Session engine, composer, tools, workspace navigation or right-side panes.
+This private browser plugin adds knowledge, digital employees, connectors, skills and templates to DSH. The native work window remains the default entry and owns every conversation. Workbench and deliverable pages are removed.
 
 ## Use this package
 
-The Web bundle mounts `ui-qzos`. Remove or disable that row to restore the upstream presentation. The plugin owns its `qzos-*` main panels and sidebar entries. Browser-memory state retains drafts, catalog selections and simulated conversations across panel navigation; refresh clears it. Employee cards and details open the native work window and insert a structured `@employee` reference without sending, replacing the draft or changing earlier messages. The native `@` menu lists employees first and matches partial names or role keywords; original file and Session references remain available. Selecting the same employee twice from the catalog does not duplicate its chip. With no selected Session, a sole Workspace opens its blank Session; otherwise the user first selects a Workspace in the native window. Templates fill the current draft without submitting it.
+The Web bundle mounts `ui-qzos`. Removing the row restores the upstream presentation. Run `pnpm run dev:web --patch apps/web/tests/pin-browse-picker.overlay.yml --port 3081` with the root `.node-version`; keep launcher options before Web options.
 
-Start through `pnpm dsh web --patch apps/web/tests/pin-browse-picker.overlay.yml` using the root `.node-version`. For developer state previews, set `sessionStorage.setItem("qzos.preview", "1")` in the browser console and reload; remove that key to hide the controls. Ordinary users see the demo-data label but no state controls. Native DSH controls still perform their original actions; only QZOS panels are synthetic.
+Knowledge and employee presentation follows the existing QZOS client: `qzos-pc/src/pages/application/layout/{kb,robot}.vue`, `application/kb/detail/`, and `application/robot/setting.vue` with its child views. Cover cards, member entry, employee avatars and menus, detail sidebars, creation fields and grouped configuration follow those sources. Chinese source labels are retained in locale dictionaries. Publication artwork comes from the existing QZOS assets. Connectors, skills and templates keep the native Plugins/Automation tasks page style.
+
+The browser-only store supports resource creation/editing/deletion, document and fragment lists, import selection, search previews, member changes, settings, employee menus, publication examples and conversation records. Refresh clears these changes. Image selection reads local images for preview; document selection stages names and synthetic rows, without uploading, parsing, OCR or learning. Exports contain synthetic data. Publication links use `example.invalid`; keys are nonfunctional examples. Native DSH modals, menus, controls and effect-owned registrations provide the interaction machinery.
+
+Employee entry returns to the native composer and inserts `@employee` without sending or replacing the draft. New and edited preview employees update that menu. Partial-name/role matching, original file/Session references and duplicate prevention remain. Preview employee references refuse execution with an explanation; removing them restores ordinary DSH submission. A sole Workspace may prepare its blank Session; otherwise select a Workspace first.
 
 ## Model Experience
 
-No model requests, token usage or KV-cache changes. Native draft, navigation and trigger services support the employee entry. Preview employee references refuse submission with a localized explanation; deleting the references restores ordinary DSH submission. Entering a blank native Session may use the existing DSH Workspace flow, but does not run a model or employee task. Catalog actions have no QZOS business API or credential integration.
+No QZOS business API, model, retrieval, authorization, billing, parser, publishing or external connector calls are made by these previews. DSH native controls retain their normal behavior.
 
 ## Known Limitations and Deferred Work
 
-This first slice targets desktop Web with collapsible navigation in narrow windows. Upload, publishing, external authorization, skill installation, file generation and download are unavailable. Previews and selections do not grant permissions. Business identity, citations, billing and task execution remain future integrations. Electron is not validated.
+Business execution and authoritative data integration remain deferred. Simulated permissions do not grant access. Connector authorization, skill installation and template application remain unavailable. Desktop Web and narrow layouts are covered; Electron is not validated.

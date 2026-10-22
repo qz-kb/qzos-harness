@@ -1,79 +1,80 @@
-/** Ephemeral demo state shared by the QZOS panels; never persisted to a Host. */
+/** Browser-only catalog viewing state; native DSH owns all conversations and drafts. */
 import { defineStore } from '@deepseek-ai/dsh-client-store'
-import type { Panel } from './catalog.ts'
+import { catalogs, type Example, type Panel } from './catalog.ts'
+import type { PreviewValues } from './resource-schema.ts'
+import { documentExamples, fragmentExamples, memberExamples, dialogueExamples, type PreviewRow } from './resource-fixtures.ts'
 
-export interface DemoConversation {
-  id: string
-  prompt: string
-  employee: string
-  knowledge: string
-  status: 'running' | 'done' | 'stopped' | 'failed'
-}
-interface DemoState {
+interface CatalogState {
+  knowledge: Example[]
+  employees: Example[]
+  resourceRows: Record<string, PreviewRow[]>
   sequence: number
-  draft: string
-  employee: string
-  knowledge: string
-  current: string | null
-  conversations: DemoConversation[]
   queries: Partial<Record<Panel, string>>
-  filters: Partial<Record<Panel, boolean>>
+  filters: Partial<Record<Panel, string>>
   details: Partial<Record<Panel, string | null>>
+  sections: Partial<Record<Panel, string | null>>
   previewState: 'normal' | 'loading' | 'error' | 'empty'
-  failNext: boolean
 }
 
-/** Create one shared, browser-memory-only presentation store.
+/** Create panel-local selections shared across navigation.
  * @returns A handle bound by the slot renderer.
  */
 export function createQzosStore() {
   return defineStore({
-    init: (): DemoState => ({
-      sequence: 0, draft: '', employee: 'employee-assistant', knowledge: 'kb-team', current: null,
-      conversations: [{ id: 'demo-weekly', prompt: '整理团队一周工作总结', employee: 'employee-writer', knowledge: 'kb-team', status: 'done' }],
-      queries: {}, filters: {}, details: {}, previewState: 'normal', failNext: false,
-    }),
+    init: (): CatalogState => ({ knowledge: catalogs.knowledge.map(item => ({ ...item })), employees: catalogs.employees.map(item => ({ ...item })), resourceRows: {}, sequence: 0, queries: {}, filters: {}, details: {}, sections: {}, previewState: 'normal' }),
     actions: {
-      setDraft: (state, value: string) => { state.draft = value },
+      saveResource: (state, panel: 'knowledge' | 'employees', id: string | null, values: PreviewValues) => {
+        const current = state[panel].find(item => item.id === id)
+        if (current && (panel === 'employees' || current.scope === 'owned')) {
+          current.title = values.name ?? current.title
+          current.description = values.intro ?? current.description
+          current.values = { ...values }
+        } else if (id === null) {
+          const resourceId = `${panel}-preview-${++state.sequence}`
+          state[panel].unshift({ id: resourceId, title: values.name ?? '', description: values.intro ?? '', scope: panel === 'knowledge' ? 'owned' : 'private',
+            category: panel === 'knowledge' ? '个人知识' : '数字员工', status: 'ready', metadata: panel === 'knowledge' ? '0 份资料' : '', content: '', values: { ...values } })
+          state.filters[panel] = panel === 'knowledge' ? 'owned' : 'all'
+          state.queries[panel] = ''
+        }
+      },
+      deleteResource: (state, panel: 'knowledge' | 'employees', id: string) => {
+        state[panel] = state[panel].filter(item => item.id !== id || (panel === 'knowledge' && item.scope !== 'owned'))
+        if (state.details[panel] === id) state.details[panel] = null
+      },
+      transferKnowledge: (state, id: string, memberId: string) => {
+        const knowledge = state.knowledge.find(item => item.id === id && item.scope === 'owned')
+        const members = state.resourceRows[`${id}:members`] ?? []
+        if (!knowledge || !members.some(member => member.id === memberId)) return
+        knowledge.scope = 'shared'
+        for (const member of members) {
+          member.role = member.id === memberId ? 'owner' : 'member'
+          member.power = member.id === memberId ? 'all' : 'manage'
+        }
+      },
+      employeeStatus: (state, id: string, status: 'ready' | 'pending') => {
+        const employee = state.employees.find(item => item.id === id)
+        if (employee) employee.status = status
+      },
+      initializeRows: (state, key: string, kind: 'documents' | 'fragments' | 'members' | 'dialogues' | 'empty') => {
+        if (state.resourceRows[key]) return
+        const rows = kind === 'documents' ? documentExamples : kind === 'fragments' ? fragmentExamples : kind === 'members' ? memberExamples : kind === 'dialogues' ? dialogueExamples : []
+        state.resourceRows[key] = (key.startsWith('employees-preview-') ? [] : key.startsWith('knowledge-preview-') ? kind === 'documents' || kind === 'members' ? rows.slice(0, 1) : [] : rows).map(row => ({ ...row }))
+      },
+      saveRow: (state, key: string, id: string | null, values: PreviewValues) => {
+        const rows = state.resourceRows[key] ?? (state.resourceRows[key] = [])
+        const row = rows.find(item => item.id === id)
+        if (row) Object.assign(row, values)
+        else rows.push({ ...values, id: `row-${++state.sequence}`, name: values.name ?? values.nickname ?? values.question ?? '' })
+      },
+      deleteRows: (state, key: string, ids: string[]) => {
+        state.resourceRows[key] = (state.resourceRows[key] ?? []).filter(item => !ids.includes(item.id))
+      },
+
       setQuery: (state, panel: Panel, value: string) => { state.queries[panel] = value },
-      setFilter: (state, panel: Panel, value: boolean) => { state.filters[panel] = value },
-      setDetail: (state, panel: Panel, value: string | null) => { state.details[panel] = value },
-      setPreview: (state, value: DemoState['previewState']) => { state.previewState = value },
-      setFailNext: (state, value: boolean) => { state.failNext = value },
-      choose: (state, kind: 'employee' | 'knowledge', id: string) => {
-        state[kind] = id
-        state.current = null
-        for (const chat of state.conversations) if (chat.status === 'running') chat.status = 'stopped'
-      },
-      newConversation: (state) => {
-        state.current = null
-        for (const chat of state.conversations) if (chat.status === 'running') chat.status = 'stopped'
-      },
-      open: (state, id: string) => { state.current = id },
-      send: (state) => {
-        const prompt = state.draft.trim()
-        if (!prompt || state.conversations.some(chat => chat.status === 'running')) return
-        const previous = state.conversations.find(chat => chat.id === state.current)
-        const id = `demo-${++state.sequence}`
-        state.conversations.unshift({ id, prompt, employee: previous?.employee ?? state.employee, knowledge: previous?.knowledge ?? state.knowledge, status: 'running' })
-        state.current = id
-        state.draft = ''
-      },
-      settle: (state, id: string) => {
-        const chat = state.conversations.find(item => item.id === id)
-        if (chat?.status !== 'running') return
-        chat.status = state.failNext ? 'failed' : 'done'
-        state.failNext = false
-      },
-      stop: (state, id: string) => {
-        const chat = state.conversations.find(item => item.id === id)
-        if (chat?.status === 'running') chat.status = 'stopped'
-      },
-      retry: (state, id: string) => {
-        if (state.conversations.some(item => item.status === 'running')) return
-        const chat = state.conversations.find(item => item.id === id)
-        if (chat?.status === 'failed' || chat?.status === 'stopped') chat.status = 'running'
-      },
+      setFilter: (state, panel: Panel, value: string) => { state.filters[panel] = value },
+      setDetail: (state, panel: Panel, value: string | null) => { state.details[panel] = value; state.sections[panel] = null },
+      setSection: (state, panel: Panel, value: string) => { state.sections[panel] = value },
+      setPreview: (state, value: CatalogState['previewState']) => { state.previewState = value },
     },
   })
 }

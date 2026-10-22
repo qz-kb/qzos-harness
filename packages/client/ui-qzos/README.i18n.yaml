@@ -2,15 +2,15 @@
 # section, a hash of its English and Chinese blocks outside code blocks and generated regions.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-qzos/README.md
-/qzos-workspace-preview:
-  en: ff5e16b366eea901
-  zh: 9efc9332cc900804
-/qzos-workspace-preview/use-this-package:
-  en: a031f327333b7da5
-  zh: 7caa5161c40e830a
-/qzos-workspace-preview/model-experience:
-  en: 591e1092299e2828
-  zh: 69b84186102032b5
-/qzos-workspace-preview/known-limitations-and-deferred-work:
-  en: dd834f90918ef264
-  zh: 7e9a166974687e20
+/qzos-resource-page-preview:
+  en: 632b2fcadfb6d6e5
+  zh: e668c87116a08210
+/qzos-resource-page-preview/use-this-package:
+  en: 2106516fa071c3ce
+  zh: 4d3a3d70da6198db
+/qzos-resource-page-preview/model-experience:
+  en: 2a6d1fc0dc044573
+  zh: 5a22a19c3f0ad0f9
+/qzos-resource-page-preview/known-limitations-and-deferred-work:
+  en: df590112604ea512
+  zh: be50a22233f41531
