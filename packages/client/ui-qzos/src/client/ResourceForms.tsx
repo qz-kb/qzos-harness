@@ -12,12 +12,13 @@ type FormProps = PropsLocale<'qzos'> & {
   draft: PreviewValues
   onChange: (key: string, value: string) => void
   knowledge: readonly Example[]
+  options?: Record<string, { value: string; label: string; disabled?: boolean }[]>
   editing?: boolean
   disabled?: boolean
 }
 
 /** Render original QZOS field order, option sets and conditional fields. */
-export function ResourceFields({ form, draft, onChange, knowledge, editing, disabled, t }: FormProps) {
+export function ResourceFields({ form, draft, onChange, knowledge, editing, disabled, options, t }: FormProps) {
   const prefix = useId()
   const fields: readonly PreviewField[] = resourceForms[form]
   return <div className={`${css.formFields} ${form === 'knowledgeSettings' ? css.topLabels : ''}`}>{fields.map((field) => {
@@ -30,7 +31,7 @@ export function ResourceFields({ form, draft, onChange, knowledge, editing, disa
       <label htmlFor={id}>{field.required && <span className={css.required} aria-hidden="true">*</span>}{t(field.label)}</label>
       <div className={css.formControl}>
         {field.kind === 'textarea' ? <textarea id={id} rows={field.id === 'welcome_introducer' ? 8 : 4} value={value} required={field.required} disabled={locked} onChange={(event) =>{  onChange(field.id, event.target.value) }} />
-          : field.kind === 'select' ? <select id={id} value={value} disabled={locked} onChange={(event) =>{  onChange(field.id, event.target.value) }}>{field.options?.map(option => <option key={option.value} value={option.value}>{t(option.label)}</option>)}</select>
+          : field.kind === 'select' ? <select id={id} value={value} disabled={locked} onChange={(event) =>{  onChange(field.id, event.target.value) }}>{options?.[field.id] ? <><option value="">—</option>{options[field.id]?.map(option => <option key={option.value} value={option.value} disabled={option.disabled}>{option.label}</option>)}</> : field.options?.map(option => <option key={option.value} value={option.value}>{t(option.label)}</option>)}</select>
             : field.kind === 'radio' ? <div className={css.radioGroup} role="group" aria-label={t(field.label)}>{field.options?.map(option => <label key={option.value}><input type="radio" name={id} checked={value === option.value} value={option.value} disabled={locked} onChange={() =>{  onChange(field.id, option.value) }} />{t(option.label)}</label>)}</div>
               : field.kind === 'knowledge' ? <div className={css.checkList} id={id}>{knowledge.map(item => <label key={item.id}><input type="checkbox" disabled={locked} checked={value.split(',').includes(item.id)} onChange={(event) =>{  onChange(field.id, (event.target.checked ? [...value.split(',').filter(Boolean), item.id] : value.split(',').filter(key => key !== item.id)).join(',')) }} />{item.title}</label>)}<small>{t(resourceCopy.selectKnowledgeHint)}</small></div>
                 : field.kind === 'range' ? <div className={css.range}><input id={id} type="range" min={field.min} max={field.max} step={field.step ?? 1} value={value} disabled={locked} onChange={(event) =>{  onChange(field.id, event.target.value) }} /><input type="number" aria-label={t(field.label)} min={field.min} max={field.max} step={field.step ?? 1} value={value} disabled={locked} onChange={(event) =>{  onChange(field.id, event.target.value) }} /></div>

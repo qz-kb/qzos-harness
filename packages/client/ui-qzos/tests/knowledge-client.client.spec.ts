@@ -1,0 +1,45 @@
+/** Real transport behavior without contacting external providers. */
+import { afterEach, expect, it, vi } from 'vitest'
+import { knowledgeRequest, knowledgePages, knowledgeTable, saveKnowledge } from '../src/client/knowledge-client.ts'
+import { loginApi, loginSessionKey } from '../src/client/login-client.ts'
+
+function setup() {
+  const values = new Map([[loginSessionKey, JSON.stringify({ api: loginApi, token: 'business-test' })]])
+  vi.stubGlobal('sessionStorage', { getItem: (key: string) => values.get(key) ?? null })
+  const fetcher = vi.fn<typeof fetch>()
+  vi.stubGlobal('fetch', fetcher)
+  return { values, fetcher }
+}
+const reply = (data: unknown) => new Response(JSON.stringify({ code: 1, data }), { status: 200 })
+afterEach(() => { vi.unstubAllGlobals() })
+
+it('uses business authorization and preserves array responses without Host cookies', async () => {
+  const { fetcher } = setup(); fetcher.mockResolvedValue(reply([{ id: 0, owned: 1 }]))
+  expect(await knowledgeRequest('/kb.know/teamLists?kb_id=1')).toEqual([{ id: 0, owned: 1 }])
+  expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ credentials: 'omit', redirect: 'error', headers: { token: 'business-test' } })
+})
+it('rejects requests without login and drops a response after an identity change', async () => {
+  const { fetcher, values } = setup()
+  fetcher.mockImplementation(() => { values.clear(); return Promise.resolve(reply({ id: 1 })) })
+  await expect(knowledgeRequest('/kb.know/detail?id=1')).rejects.toThrow('登录账号已变更')
+  await expect(knowledgeRequest('/kb.know/detail?id=1')).rejects.toThrow('请先登录')
+  expect(fetcher).toHaveBeenCalledTimes(1)
+})
+it('does not treat a business failure as successful saving', async () => {
+  const { fetcher } = setup(); fetcher.mockResolvedValue(new Response(JSON.stringify({ code: 0, msg: 'model unavailable' })))
+  await expect(saveKnowledge(null, { name: 'test', image: '/cover.png', embedding_model_id: '2', documents_model_id: '1:3' })).rejects.toThrow('model unavailable')
+  const body = fetcher.mock.calls[0]?.[1]?.body
+  if (typeof body !== 'string') throw new Error('Missing request body')
+  expect(JSON.parse(body)).toMatchObject({ documents_model_id: 1, documents_model_sub_id: 3, embedding_model_id: 2 })
+})
+it('reads all pages and rejects a truncated collection', async () => {
+  const { fetcher } = setup()
+  fetcher.mockResolvedValueOnce(reply({ lists: [{ id: 1 }], count: 2 })).mockResolvedValueOnce(reply({ lists: [{ id: 2 }], count: 2 }))
+  expect(await knowledgePages('/kb.know/lists?type=0')).toHaveLength(2)
+  fetcher.mockResolvedValue(reply({ lists: [], count: 1 }))
+  await expect(knowledgePages('/kb.know/lists')).rejects.toThrow('pagination')
+})
+it('maps server member identities and learning states without fabricated values', () => {
+  expect(knowledgeTable([{ id: 0, sn: 42, nickname: 'Owner', power: 1, owned: 1 }], 'members')[0]).toMatchObject({ id: '0', sn: '42', role: 'owner' })
+  expect(knowledgeTable([{ uuid: 'fragment-1', status: 1, tokens: 12 }], 'fragments')[0]).toMatchObject({ id: 'fragment-1', status: 'learning', consumed: '12' })
+})

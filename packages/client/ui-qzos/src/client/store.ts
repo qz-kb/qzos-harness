@@ -5,6 +5,9 @@ import type { PreviewValues } from './resource-schema.ts'
 import { documentExamples, fragmentExamples, memberExamples, dialogueExamples, type PreviewRow } from './resource-fixtures.ts'
 
 interface CatalogState {
+  businessUser: string | null
+  businessEpoch: number
+  knowledgeRevision: number
   knowledge: Example[]
   employees: Example[]
   resourceRows: Record<string, PreviewRow[]>
@@ -21,8 +24,14 @@ interface CatalogState {
  */
 export function createQzosStore() {
   return defineStore({
-    init: (): CatalogState => ({ knowledge: catalogs.knowledge.map(item => ({ ...item })), employees: catalogs.employees.map(item => ({ ...item })), resourceRows: {}, sequence: 0, queries: {}, filters: {}, details: {}, sections: {}, previewState: 'normal' }),
+    init: (): CatalogState => ({ businessUser: null, businessEpoch: 0, knowledgeRevision: 0, knowledge: catalogs.knowledge.map(item => ({ ...item })), employees: catalogs.employees.map(item => ({ ...item })), resourceRows: {}, sequence: 0, queries: {}, filters: {}, details: {}, sections: {}, previewState: 'normal' }),
     actions: {
+      businessIdentity: (state, id: string | null) => {
+        if (state.businessUser === id) return
+        state.businessUser = id; state.businessEpoch++; state.knowledgeRevision++
+        state.details.knowledge = null
+      },
+      refreshKnowledge: (state) => { state.knowledgeRevision++ },
       saveResource: (state, panel: 'knowledge' | 'employees', id: string | null, values: PreviewValues) => {
         const current = state[panel].find(item => item.id === id)
         if (current && (panel === 'employees' || current.scope === 'owned')) {

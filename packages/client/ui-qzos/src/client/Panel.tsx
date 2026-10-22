@@ -11,7 +11,7 @@ import { ResourcePanel } from './ResourcePanel.tsx'
 
 type Copy = PropsLocale<'qzos'>
 type View = PropsStore<ReturnType<typeof createQzosStore>>
-export type PanelProps = Copy & View & {
+export type PanelProps = Copy & View & Pick<PropsRuntime<'main'>, 'useResource'> & {
   panel: Panel
   developer: boolean
   openEmployee: (id: string, title?: string) => Promise<string | undefined>
@@ -36,8 +36,11 @@ export function Brand({ t }: Copy) { return <strong className={css.brand}>{t('br
 
 /** Render one catalog with QZOS resource organization and DSH page styling. */
 export function QzosPanel(props: PanelProps) {
+  const user = props.useStore(state => state.businessUser)
+  const epoch = props.useStore(state => state.businessEpoch)
+  if (props.panel === 'knowledge' && !user) return null
   return props.panel === 'knowledge' || props.panel === 'employees'
-    ? <ResourcePanel {...props} panel={props.panel} /> : <CatalogPanel {...props} />
+    ? <ResourcePanel key={props.panel === 'knowledge' ? epoch : props.panel} {...props} panel={props.panel} /> : <CatalogPanel {...props} />
 }
 
 function CatalogPanel({ panel, developer, t, useStore, actions }: PanelProps) {

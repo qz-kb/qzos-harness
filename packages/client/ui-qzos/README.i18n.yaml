@@ -2,15 +2,39 @@
 # section, a hash of its English and Chinese blocks outside code blocks and generated regions.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-qzos/README.md
+/:
+  en: cdc87b2d256b045f
+  zh: 8b4b7282b86b2fdb
 /qzos-resource-page-preview:
-  en: 632b2fcadfb6d6e5
-  zh: e668c87116a08210
+  en: 6e53aca87f01eeb3
+  zh: 9a08df5010eca4de
+/qzos-resource-page-preview/summary:
+  en: c33013c1436cf0e9
+  zh: 4b039868654366e5
+/qzos-resource-page-preview/table-of-contents:
+  en: d4e9596852e22009
+  zh: 378f6a3af583363c
 /qzos-resource-page-preview/use-this-package:
-  en: 2106516fa071c3ce
-  zh: 4d3a3d70da6198db
+  en: a7dd92cef6e7aefb
+  zh: d9bc2258c35ad0f6
 /qzos-resource-page-preview/model-experience:
-  en: 2a6d1fc0dc044573
-  zh: 5a22a19c3f0ad0f9
+  en: 215e7ba838619b7b
+  zh: cb2efa0b6fcc4057
+/qzos-resource-page-preview/model-experience/business-actions:
+  en: 928419c0b8ae33a8
+  zh: 1353d8f5bb7858c2
+/qzos-resource-page-preview/model-experience/business-actions/what-the-model-sees:
+  en: fc0c90b809a7042a
+  zh: 0f359ffdaf368b6d
+/qzos-resource-page-preview/model-experience/business-actions/token-effect:
+  en: 0eb6a572eaf92ad6
+  zh: adae2e041224301d
+/qzos-resource-page-preview/model-experience/business-actions/kv-cache-effect:
+  en: ab91af0850cf5d86
+  zh: 3371930aa4636b5c
 /qzos-resource-page-preview/known-limitations-and-deferred-work:
-  en: df590112604ea512
-  zh: be50a22233f41531
+  en: bfa80af59500ea73
+  zh: 4703106efc9e9885
+/qzos-resource-page-preview/known-limitations-and-deferred-work/dev-note:
+  en: 4ed3eb25194f77a0
+  zh: d0a885963a9ca529

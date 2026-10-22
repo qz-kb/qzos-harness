@@ -49,6 +49,12 @@
     },
     {
       "path": "../../core/session"
+    },
+    {
+      "path": "../resources"
+    },
+    {
+      "path": "../../util/crypto"
     }
   ]
 }
