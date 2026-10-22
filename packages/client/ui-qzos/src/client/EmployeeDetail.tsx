@@ -59,6 +59,9 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
   const [selectedKey, setSelectedKey] = useState('')
   const [calls, setCalls] = useState<LoginRecord[] | null>(null)
   const [notice, setNotice] = useState('')
+  const [confirmKnowledgeRemoval, setConfirmKnowledgeRemoval] = useState(false)
+  const rebindRequired = Boolean(original.knowledge_rebind_required)
+  const knowledgeAction = draft.knowledge_dependency_action || 'preserve'
   const menusKey = `${item.id}:menus`
   const sharesKey = `${item.id}:${channel === 'api' ? 'apps' : 'shares'}`
   const bindingsKey = `${item.id}:bindings`
@@ -82,6 +85,10 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
     finally { pending.current = false; setBusy(false) }
   }
   const refresh = () => { setRevision(value => value + 1) }
+  const saveConfiguration = () => { void perform(async () => {
+    await saveEmployee(original, draft, menuValues, lifetime.signal)
+    setConfirmKnowledgeRemoval(false); onSaved()
+  }) }
   const unsupported = () => { setNotice(t('employeeUnsupported')) }
   const update = (key: string, value: string) =>{  setDraft(current => ({ ...current, [key]: value })) }
   const show = (kind: EmployeeDialog['kind'], row?: PreviewRow, readOnly = false) => {
@@ -132,14 +139,28 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
           <Button key={tab} aria-pressed={editTab === tab} onClick={() =>{  setEditTab(tab) }}>{r(label)}</Button>)}
       </div>
       <header className={css.configHeading}><h2>{r(tabList.find(([tab]) => tab === editTab)?.[1] ?? 'base')}</h2></header>
+      {editTab === 'employeeBase' && rebindRequired && <div className={css.inner}>
+        <p role="status">{t('employeeKnowledgeInvalid')}</p>
+        <label>{t('employeeKnowledgeAction')}<select aria-label={t('employeeKnowledgeAction')} value={knowledgeAction} disabled={busy || original.can_manage_knowledge_dependency === false} onChange={(event) => {
+          const action = event.target.value
+          setDraft(current => ({ ...current, knowledge_dependency_action: action, kb_ids: employeeDraft(original).kb_ids ?? '' }))
+        }}>
+          <option value="preserve">{t('employeeKnowledgePreserve')}</option><option value="replace">{t('employeeKnowledgeReplace')}</option><option value="remove">{t('employeeKnowledgeRemove')}</option>
+        </select></label>
+        {knowledgeAction === 'replace' && <p>{t('employeeKnowledgeSelect')}</p>}
+        {knowledgeAction === 'remove' && <p>{t('employeeKnowledgeRemoveHint')}</p>}
+      </div>}
       {editTab === 'bindings' ? <div className={css.inner}><div className={css.toolbar}><Button onClick={unsupported}>{r('bindSkill')}</Button><Button onClick={unsupported}>{r('bindPlugin')}</Button></div><ResourceTable r={r} rows={bindings} columns={[['name', 'bindingName'], ['kind', 'bindingStatus']]} actions={row => [{ label: 'delete', run: () =>{  setConfirmation({ key: bindingsKey, ids: [row.id] }) } }]} /></div>
         : <>{editTab === 'employeeSearch' && <p className={css.notice}>{r('parameterNotice')}</p>}{editTab === 'employeeFlow' && <div className={css.notice}>{r('flowNotice')}<br />{r('flowNotice2')}</div>}
           <ResourceFields t={t} form={editTab} draft={draft} knowledge={knowledge} options={modelOptions}
-            onChange={update} editing disabled={busy} />
+            onChange={update} editing disabled={busy} disabledFields={original.can_manage_knowledge_dependency === false || (rebindRequired && knowledgeAction !== 'replace') ? ['kb_ids'] : []} />
           {editTab === 'employeeBase' && <div className={css.inner}><p className={css.notice}>{r('helpRole')}</p></div>}
           {editTab === 'employeeInterface' && <div className={css.menuEditor}><p className={css.notice}>{r('helpWelcome')}</p><h3>{r('menus')}</h3><ResourceTable rows={menus} r={r} columns={[['keyword', 'keywordLabel'], ['content', 'replyContent']]} actions={row => [{ label: 'view', run: () =>{  show('menu', row, true) } }, { label: 'edit', run: () =>{  show('menu', row) } }, { label: 'delete', run: () =>{  setConfirmation({ key: menusKey, ids: [row.id] }) } }]} /><Button variant="primary" disabled={menus.length >= 3} onClick={() =>{  show('menu') }}>+ {r('addMenu')}</Button><p className={css.notice}>{r('menuHint')}</p></div>}
         </>}
-      <div className={css.formFooter}><Button variant="primary" disabled={busy || !draft.name?.trim()} onClick={() => { void perform(async () => { await saveEmployee(original, draft, menuValues, lifetime.signal); onSaved() }) }}>{r('save')}</Button></div>
+      <div className={css.formFooter}><Button variant="primary" disabled={busy || !draft.name?.trim() || (knowledgeAction === 'replace' && !draft.kb_ids)} onClick={() => {
+        if (knowledgeAction === 'remove') setConfirmKnowledgeRemoval(true)
+        else saveConfiguration()
+      }}>{r('save')}</Button></div>
     </>}
     {section === 'release' && <div className={css.inner}>
       <div className={css.toolbar}><div className={css.inline}><Button disabled={busy} onClick={() => { void perform(async () => { await request('/kb.publish/employeeState', { robot_id: Number(item.id), state: 'ready' }); onSaved() }) }}>{r('onDuty')}</Button><Button disabled={busy} onClick={() => { void perform(async () => { await request('/kb.publish/employeeState', { robot_id: Number(item.id), state: 'paused' }); onSaved() }) }}>{r('pauseEmployee')}</Button></div></div>
@@ -184,6 +205,10 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
                 : dialog?.kind === 'api' ? <label>{r('name')}<Input value={dialogDraft.name ?? ''} onChange={(event) =>{  setDialogDraft(current => ({ ...current, name: event.target.value })) }} /></label>
                   : <>{dialog?.kind === 'correct' && <select aria-label={r('knowledge')} value={dialogDraft.kb_id ?? ''} onChange={(event) => { setDialogDraft(current => ({ ...current, kb_id: event.target.value })) }}><option value="">—</option>{knowledge.map(kb => <option key={kb.id} value={kb.id}>{kb.title}</option>)}</select>}<ResourceFields t={t} form={form} draft={dialogDraft} knowledge={knowledge} disabled={dialog?.readOnly ?? false}
                     onChange={(key, value) =>{  setDialogDraft(current => ({ ...current, [key]: value })) }} /></>}
+    </Modal>
+    <Modal className={css.employeeDialog as string} open={confirmKnowledgeRemoval} onClose={() => { if (!busy) setConfirmKnowledgeRemoval(false) }} closeLabel={r('close')} title={t('employeeKnowledgeRemove')} description={t('employeeKnowledgeRemoveHint')}
+      footer={<><Button disabled={busy} variant="outline" onClick={() => { setConfirmKnowledgeRemoval(false) }}>{r('cancel')}</Button><Button disabled={busy} variant="primary" onClick={saveConfiguration}>{r('confirm')}</Button></>}>
+      {notice && <p role="alert">{notice}</p>}
     </Modal>
     <Modal className={css.employeeDialog as string} open={confirmation !== null} onClose={() =>{  setConfirmation(null) }} closeLabel={r('close')} title={r('deleteConfirm')} description={r('deleteHint')}
       footer={<><Button variant="outline" onClick={() =>{  setConfirmation(null) }}>{r('cancel')}</Button><Button variant="primary" disabled={busy} onClick={remove}>{r('confirmDelete')}</Button></>} />

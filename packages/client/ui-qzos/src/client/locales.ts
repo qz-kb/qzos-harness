@@ -1,6 +1,13 @@
 /** Localized controls for QZOS resource previews. */
 export const zh = {
   employeeLoading: '正在加载数字员工…',
+  employeeKnowledgeInvalid: '关联知识库已失效。请重新绑定或明确移除；保留原关联时，员工仍无法开始新的问答。',
+  employeeKnowledgeAction: '处理失效知识关联',
+  employeeKnowledgePreserve: '保留原关联',
+  employeeKnowledgeReplace: '重新绑定',
+  employeeKnowledgeRemove: '移除全部知识关联',
+  employeeKnowledgeSelect: '请选择至少一个知识库；保存后从下一轮提问开始使用。',
+  employeeKnowledgeRemoveHint: '确认移除全部知识关联？下一轮不再检索关联知识库；已有会话历史和知识引用仍会保留。',
   employeeModelRequired: '请先配置并选择可用的员工模型，再保存完整配置。',
   employeeWriteUnknown: '写入结果未确认，请刷新列表核对，勿重复创建。',
   employeeUnsupported: '此能力尚未接入真实业务，未提交修改。',
@@ -435,6 +442,13 @@ export const zh = {
 export type QzosKey = keyof typeof zh
 export const en: Record<QzosKey, string> = {
   employeeLoading: 'Loading employees…',
+  employeeKnowledgeInvalid: 'Linked knowledge is unavailable. Rebind or explicitly remove it; preserving it keeps new employee requests blocked.',
+  employeeKnowledgeAction: 'Resolve unavailable knowledge',
+  employeeKnowledgePreserve: 'Preserve existing links',
+  employeeKnowledgeReplace: 'Rebind knowledge',
+  employeeKnowledgeRemove: 'Remove all knowledge links',
+  employeeKnowledgeSelect: 'Select at least one knowledge base. Saved changes apply to the next question.',
+  employeeKnowledgeRemoveHint: 'Remove all knowledge links? The next question will not retrieve linked knowledge. Existing conversation history and citations remain.',
   employeeModelRequired: 'Configure and select an employee model before saving.',
   employeeWriteUnknown: 'Write outcome is unconfirmed. Refresh before creating again.',
   employeeUnsupported: 'This capability is not connected. No changes were submitted.',

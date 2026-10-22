@@ -15,10 +15,11 @@ type FormProps = PropsLocale<'qzos'> & {
   options?: Record<string, { value: string; label: string; disabled?: boolean }[]>
   editing?: boolean
   disabled?: boolean
+  disabledFields?: readonly string[]
 }
 
 /** Render original QZOS field order, option sets and conditional fields. */
-export function ResourceFields({ form, draft, onChange, knowledge, editing, disabled, options, t }: FormProps) {
+export function ResourceFields({ form, draft, onChange, knowledge, editing, disabled, disabledFields, options, t }: FormProps) {
   const prefix = useId()
   const fields: readonly PreviewField[] = resourceForms[form]
   return <div className={`${css.formFields} ${form === 'knowledgeSettings' ? css.topLabels : ''}`}>{fields.map((field) => {
@@ -26,7 +27,7 @@ export function ResourceFields({ form, draft, onChange, knowledge, editing, disa
     if (field.unless && draft[field.unless[0]] === field.unless[1]) return null
     const id = `${prefix}-${field.id}`
     const value = draft[field.id] ?? field.initial
-    const locked = disabled || (editing && field.locked)
+    const locked = disabled || disabledFields?.includes(field.id) || (editing && field.locked)
     return <div className={css.formRow} key={field.id}>
       <label htmlFor={id}>{field.required && <span className={css.required} aria-hidden="true">*</span>}{t(field.label)}</label>
       <div className={css.formControl}>

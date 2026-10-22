@@ -17,6 +17,8 @@ it('persists bindings across reload, rechecks each turn, and refuses another acc
   let paused = false
   let rejected = false
   let searches = 0
+  let kbIds = [12]
+  let rebindRequired = false
   const agentState: Pick<Agent, 'session' | 'status' | 'cancel'> = {
     session: Session.create(SessionId('employee-test')), status: 'idle', cancel: vi.fn<Agent['cancel']>(),
   }
@@ -31,7 +33,7 @@ it('persists bindings across reload, rechecks each turn, and refuses another acc
     const path = new URL(address).pathname
     let data: unknown
     if (path.endsWith('/user/info')) data = { id:owner }
-    else if (path.endsWith('/kb.robot/detail')) data = { id:7,name:'Researcher',roles_prompt:'Role',kb_ids:[12],is_enable:1,work_state:paused?'paused':'ready' }
+    else if (path.endsWith('/kb.robot/detail')) data = { id:7,name:'Researcher',roles_prompt:'Role',kb_ids:kbIds,knowledge_rebind_required:rebindRequired,is_enable:1,work_state:paused?'paused':'ready' }
     else { searches++; data=[{ question:'source',answer:`evidence-${searches}` }] }
     return new Response(JSON.stringify({ code:1,data }))
   })
@@ -51,11 +53,20 @@ it('persists bindings across reload, rechecks each turn, and refuses another acc
     expect(first.messages[0]?.source).toEqual({ kind: 'qzos-employee-context', form: 'snapshot' })
     expect(first.messages[1]).toBe(input)
     expect(JSON.stringify(await step())).toContain('evidence-2')
+    rebindRequired=true; await expect(step()).rejects.toThrow('知识关联已失效')
+    expect(searches).toBe(2)
+    rebindRequired=false; kbIds=[14]
+    expect(JSON.stringify(await step())).toContain('\\"knowledgeId\\":14')
+    expect(searches).toBe(3)
+    kbIds=[]
+    expect(JSON.stringify(await step())).toContain('\\"sources\\":[]')
+    expect(searches).toBe(3)
+    kbIds=[12]
     paused=true; await expect(step()).rejects.toThrow('暂停'); paused=false
     await plugin.dispose(); plugin=ctx.plugin(Employees,config); await plugin.await()
     await expect(step()).rejects.toThrow('重新登录')
     await call({ action:'authorize',token:'synthetic' })
-    expect(JSON.stringify(await step())).toContain('evidence-3')
+    expect(JSON.stringify(await step())).toContain('evidence-4')
     owner='2'; await call({ action:'authorize',token:'other' })
     await expect(step()).rejects.toThrow('所属')
     expect((await call({ action:'bind',token:'other',sessionId:agent.session.id,employeeId:'7' })).status).toBe(400)
