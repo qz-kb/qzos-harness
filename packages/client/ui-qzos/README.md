@@ -24,9 +24,9 @@ The Web bundle mounts `ui-qzos`. Removing the row restores the upstream presenta
 
 Knowledge and employee presentation follows the existing QZOS client: `qzos-pc/src/pages/application/layout/{kb,robot}.vue`, `application/kb/detail/`, and `application/robot/setting.vue` with its child views. Cover cards, member entry, employee avatars and menus, detail sidebars, creation fields and grouped configuration follow those sources. Chinese source labels are retained in locale dictionaries. Publication artwork comes from the existing QZOS assets. Connectors, skills and templates keep the native Plugins/Automation tasks page style.
 
-Knowledge pages read the local QZOS catalog, configuration, documents, fragments and members through native `useResource`. Management, rename, fragment operations, membership, transfer and search use existing endpoints. Successful writes reload server state; failures retain the form and report the backend reason. No synthetic documents or search hits are generated. Identity changes unmount knowledge views and isolate resource addresses; credentials only enter local API headers. Model options come from `/index/models` and respect backend readiness. Employees and other catalogs retain their browser-only previews. Native DSH modals, menus and controls own the interaction machinery.
+Knowledge pages read the local QZOS catalog, configuration, documents, fragments and members through native `useResource`. Management, rename, fragment operations, membership, transfer and search use existing endpoints. Successful writes reload server state; failures retain the form and report the backend reason. No synthetic documents or search hits are generated. Identity changes unmount knowledge views and isolate resource addresses; credentials only enter local API headers. Model options come from `/index/models` and respect backend readiness. Employee management now uses local QZOS APIs; connectors, skills and templates retain their previews. Native DSH modals, menus and controls own the interaction machinery.
 
-Employee entry returns to the native composer and inserts `@employee` without sending or replacing the draft. New and edited preview employees update that menu. Partial-name/role matching, original file/Session references and duplicate prevention remain. Preview employee references refuse execution with an explanation; removing them restores ordinary DSH submission. A sole Workspace may prepare its blank Session; otherwise select a Workspace first.
+Employee entry creates a fresh native Session, names it for the employee and inserts `@employee` without sending. Selecting an employee in an empty composer uses that conversation; selecting one in an existing conversation opens a new one and preserves the old draft. Partial-name/role matching and original file/Session references remain. The first send loads current role settings and searches linked knowledge through QZOS authorization, then serializes only the role and retrieved excerpts into the ordinary DSH message. Disabled/paused/retired employees, invalid knowledge bindings, external workflows and failed retrieval refuse the send and retain the draft. The current or sole Workspace supplies the new Session.
 
 ## Model Experience
 
@@ -34,11 +34,11 @@ Employee entry returns to the native composer and inserts `@employee` without se
 
 #### What the model sees
 
-The `ui-qzos` browser plugin adds no DSH system prompt or tool schema. QZOS knowledge learning and search delegate to the existing business backend; employee references remain blocked from execution until integration is implemented.
+The plugin adds no DSH system prompt or tool schema. Each user turn receives `employeeId`, role and authorized knowledge excerpts; DSH logs this context and executes using the model selected in its work window. Backend model IDs, workflow secrets and login tokens are not copied into model input.
 
 #### Token effect
 
-User-requested learning and search may consume the configured QZOS model quota; listing, login and ACL operations add no DSH model tokens.
+User-requested learning and search may consume the configured QZOS model quota; the per-turn role and excerpts also consume DSH input tokens. Listing, login and ACL operations add no DSH model tokens.
 
 #### KV Cache effect
 
@@ -46,17 +46,17 @@ The plugin does not construct DSH provider requests or change their cache layout
 
 ## Known Limitations and Deferred Work
 
-- QZOS validates knowledge permissions. Employee business integration remains deferred. Connector authorization, skill installation and template application remain unavailable. Desktop Web and narrow layouts are covered; Electron is not validated.
+- QZOS validates knowledge permissions. Employee Host binding and per-turn context are connected; local synthetic knowledge answers and follow-up retrieval have been verified with working model configuration. Connector authorization, skill installation and template application remain unavailable. Desktop Web and narrow layouts are covered; Electron is not validated.
 
 The current account integration targets the local `qzos-login-test` environment only. Password recovery, production endpoint configuration, SMS/email delivery and WeChat provider verification are not included in the verified scope. This is business sign-in, not multi-user isolation for DSH files, conversations or tools.
 
 The private plugin mounts the full-screen login/register surface through the native shell overlay. Signed-out users see it before the work interface; there is no QZOS account sidebar module. Sign-in closes it, sign-out or verified session expiry brings it back. This presentation does not add multi-user authorization to the DSH Host.
 
-The local knowledge environment includes isolated PostgreSQL, original installation schemas and ACL/version migrations, plus a synthetic knowledge fixture. Usable model credentials remain absent, so successful creation/editing and learning/search are unverified. Server parsing is disabled: document import/version updates explain the missing prerequisite instead of adding browser algorithms.
+The local knowledge environment includes isolated PostgreSQL, original installation schemas and ACL/version migrations, plus a synthetic knowledge fixture. Local credentials now support successful synthetic knowledge creation, vector training and retrieval. Server parsing is disabled: document import/version updates explain the missing prerequisite instead of adding browser algorithms.
 
-File ACL now uses the existing rules/subjects/add/edit/del endpoints inside the native modal. Deletion disables rules, preserving backend history. The knowledge external-use switch uses `/kb.publish/knowledgeExternal`, confirms enablement and reads back state; switch-only saves do not require a ready model. Synthetic local API checks cover rule creation/edit/disable, owner preservation, switch round trips and anonymous rejection. Models remain unready; Python/PDF/OCR executables, private upload and server parsing are not enabled in the isolated runtime.
+File ACL now uses the existing rules/subjects/add/edit/del endpoints inside the native modal. Deletion disables rules, preserving backend history. The knowledge external-use switch uses `/kb.publish/knowledgeExternal`, confirms enablement and reads back state; switch-only saves do not require a ready model. Synthetic local API checks cover rule creation/edit/disable, owner preservation, switch round trips and anonymous rejection. Local chat and embedding models are configured; Python/PDF/OCR executables, private upload and server parsing are not enabled in the isolated runtime.
 
-Fixed local startup: workspace `scripts/start-dsh-ui.sh` forwards to the tracked plugin script `scripts/start-local.sh`. From the repository root, run `bash packages/client/ui-qzos/scripts/start-local.sh`. It reads `.node-version`, uses workspace `.local/toolchains/node-v<version>/bin` (Node plus `include/node` development headers), then delegates fresh builds and watching to upstream `dev:web`. Build failures stop startup; occupied ports fail explicitly without killing other processes. The local port is 3081; follow the launch output for Host authentication. Another machine needs the matching Node distribution, pnpm, installed dependencies and a local QZOS backend. Runtime files, test accounts and credentials are not committed.
+Fixed local startup: workspace `scripts/start-dsh-ui.sh` forwards to the tracked plugin script `scripts/start-local.sh`. From the repository root, run `bash packages/client/ui-qzos/scripts/start-local.sh`. It reads `.node-version`, uses workspace `.local/toolchains/node-v<version>/bin` (Node plus `include/node` development headers), then delegates fresh builds and watching to upstream `dev:web`. Build failures stop startup; occupied ports fail explicitly without killing other processes. The local port is 3081; startup uses `--no-open` so restarts do not accumulate browser tabs. Reuse the existing preview tab and follow the launch output for Host authentication. Another machine needs the matching Node distribution, pnpm, installed dependencies and a local QZOS backend. Runtime files, test accounts and credentials are not committed.
 
 ### Dev Note
 
@@ -66,3 +66,7 @@ Fixed local startup: workspace `scripts/start-dsh-ui.sh` forwards to the tracked
 The plugin owns business transport and native resource registration. Credentials and local runtime state stay outside Git. The original Product task records verification and remaining model/parser setup.
 
 </details>
+
+Employee management reads full configurations and preserves nested workflow settings and menu images during writes. Publication drafts, usage limits, state changes and conversation records use existing endpoints. Synthetic local checks cover creation, configuration readback, browser saving, disabled publication CRUD and anonymous rejection. API publication is blocked by the current test license; key lifecycle success is unverified. Public visitor URLs, embedding/posters and skill/plugin binding remain unavailable. Selecting an employee never sends automatically. The private Host adapter persists employee/account bindings and rechecks authorization and knowledge for each new user turn. Business login authorizes the Host in memory; after restart, page reload revalidates a saved business session and restores Host authorization, or requires sign-in if the credential is invalid. DSH answers remain native Session records, not legacy QZOS statistics. Cross-account file/history/tool isolation and quota mapping remain deferred. Local model setup and synthetic knowledge answers are verified; this does not validate the deferred employee features.
+
+Employee context is hidden in Chat; user questions, answers and their knowledge citations remain visible. New retrieval messages use the private context source and native Chat filtering. For existing history, a registered text rule recognizes only complete legacy employee envelopes and hides their Chat rows. Session records, model input and Trajectory inspection remain unchanged.

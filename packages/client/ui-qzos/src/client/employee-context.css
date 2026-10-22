@@ -1,0 +1,5 @@
+/* Only the complete legacy context row; model records and answer citations remain intact. */
+[data-chat-flow-kind="user"]:has([data-qzos-employee-context]),
+[data-chat-flow-kind="steering"]:has([data-qzos-employee-context]) {
+  display: none;
+}

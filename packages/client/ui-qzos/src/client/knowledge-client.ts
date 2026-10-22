@@ -46,9 +46,10 @@ export async function knowledgeRequest(
     signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(60000)]) : AbortSignal.timeout(60000),
   })
   if (storedLogin(sessionStorage) !== token) throw new LoginError('登录账号已变更，请重新打开页面', -1)
-  if (!response.ok) throw new Error(`QZOS HTTP ${response.status}`)
-  const result = loginRecord(await response.json())
+  const result = loginRecord(await response.json().catch(() => { throw new Error(`QZOS HTTP ${response.status}`) }))
+  if (!response.ok && typeof result.msg !== 'string') throw new Error(`QZOS HTTP ${response.status}`)
   if (result.code !== 1) throw new LoginError(typeof result.msg === 'string' ? result.msg : 'QZOS request failed', Number(result.code))
+  if (!response.ok) throw new Error(`QZOS HTTP ${response.status}`)
   return result.data
 }
 /** Read every server page, preserving errors and refusing truncated pagination.
@@ -84,6 +85,15 @@ export function installKnowledgeResources(ctx: Context): void {
             const [rows, models] = await Promise.all([knowledgePages('/kb.know/lists?type=0', signal), knowledgeRequest('/index/models', undefined, signal)])
             value = { rows, models }; break
           }
+          case 'employees': {
+            const [rows, models, knowledge] = await Promise.all([knowledgePages('/kb.robot/lists', signal), knowledgeRequest('/index/models', undefined, signal), knowledgePages('/kb.know/lists?type=0', signal)])
+            value = { rows, models, knowledge }; break
+          }
+          case 'employee': value = { detail: loginRecord(await knowledgeRequest(`/kb.robot/detail?id=${encodeURIComponent(id)}`, undefined, signal)) }; break
+          case 'employee-keys': value = { rows: knowledgeRows(await knowledgeRequest(`/kb.publish/keyLists?publish_id=${encodeURIComponent(id)}`, undefined, signal)) }; break
+          case 'employee-stats': value = loginRecord(await knowledgeRequest(`/kb.chat/dataCount?robot_id=${encodeURIComponent(id)}`, undefined, signal)); break
+          case 'employee-records': value = { rows: await knowledgePages(`/kb.chat/dataRecord?robot_id=${encodeURIComponent(id)}&is_feedback=-1`, signal) }; break
+          case 'employee-publications': value = { rows: await knowledgePages(`/kb.share/lists?robot_id=${encodeURIComponent(id)}&type=${url.searchParams.get('type') === '4' ? 4 : 1}`, signal) }; break
           case 'acl': {
             const [rows, subjects] = await Promise.all([
               knowledgeRequest(`/kb.documentAcl/rules?fd_id=${encodeURIComponent(fd)}`, undefined, signal),

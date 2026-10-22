@@ -589,3 +589,11 @@
 - insert:
     - id: ui-qzos
       name: '@deepseek-ai/dsh-client-ui-qzos'
+
+# Private QZOS employee execution adapter; local business backend only.
+- insert:
+    - id: qzos-employees
+      name: '@deepseek-ai/dsh-qzos-employees'
+      config:
+        apiUrl: http://127.0.0.1:3082/api
+        requestTimeoutMs: 60000

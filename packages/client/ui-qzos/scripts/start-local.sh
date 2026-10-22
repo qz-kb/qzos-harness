@@ -20,4 +20,4 @@ if lsof -nP -iTCP:3081 -sTCP:LISTEN >/dev/null 2>&1; then
 fi
 cd "$qzos_repo"
 echo "Node $(node --version)：构建最新代码后启动，后续修改自动重新构建。"
-exec pnpm run dev:web --patch apps/web/tests/pin-browse-picker.overlay.yml --port 3081
+exec pnpm run dev:web --patch apps/web/tests/pin-browse-picker.overlay.yml --port 3081 --no-open

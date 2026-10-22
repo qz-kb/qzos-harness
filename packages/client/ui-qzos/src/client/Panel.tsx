@@ -38,9 +38,9 @@ export function Brand({ t }: Copy) { return <strong className={css.brand}>{t('br
 export function QzosPanel(props: PanelProps) {
   const user = props.useStore(state => state.businessUser)
   const epoch = props.useStore(state => state.businessEpoch)
-  if (props.panel === 'knowledge' && !user) return null
+  if ((props.panel === 'knowledge' || props.panel === 'employees') && !user) return null
   return props.panel === 'knowledge' || props.panel === 'employees'
-    ? <ResourcePanel key={props.panel === 'knowledge' ? epoch : props.panel} {...props} panel={props.panel} /> : <CatalogPanel {...props} />
+    ? <ResourcePanel key={`${props.panel}:${epoch}`} {...props} panel={props.panel} /> : <CatalogPanel {...props} />
 }
 
 function CatalogPanel({ panel, developer, t, useStore, actions }: PanelProps) {

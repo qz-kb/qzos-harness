@@ -2600,6 +2600,28 @@ export type Config = LocalConfig
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-pwsh-sandbox -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-qzos-employees -->
+<a id="deepseek-aidsh-qzos-employees"></a>
+
+## `@deepseek-ai/dsh-qzos-employees`
+
+- `inject`: `webServer` · `connection` · `agents` · `storageDomain`
+- `source`: [`packages/host/qzos-employees/src/index.ts:21`](../packages/host/qzos-employees/src/index.ts)
+
+```ts config-catalog
+/** Explicit local QZOS endpoint configuration. */
+export type Config = BusinessConfig
+
+/** Fixed backend origin and request deadline supplied by the plugin configuration. */
+export interface BusinessConfig {
+  /** QZOS business API base URL, without embedded credentials. */
+  apiUrl: string
+  /** Maximum duration of one business request in milliseconds. */
+  requestTimeoutMs: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-qzos-employees -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-repeat-tool-reminder -->
 <a id="deepseek-aidsh-repeat-tool-reminder"></a>
 
@@ -4595,6 +4617,7 @@ export interface Config {
 | `@deepseek-ai/dsh-client-ui-permission-presets` | — | [`packages/client/ui-permission-presets/src/index.ts`](../packages/client/ui-permission-presets/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-plan` | — | [`packages/client/ui-plan/src/index.ts`](../packages/client/ui-plan/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-plugin-market` | — | [`packages/client/ui-plugin-market/src/index.ts`](../packages/client/ui-plugin-market/src/index.ts) |
+| `@deepseek-ai/dsh-client-ui-qzos` | — | [`packages/client/ui-qzos/src/index.ts`](../packages/client/ui-qzos/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-reference` | — | [`packages/client/ui-reference/src/index.ts`](../packages/client/ui-reference/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-renderer` | — | [`packages/client/ui-renderer/src/index.ts`](../packages/client/ui-renderer/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-schedule` | — | [`packages/client/ui-schedule/src/index.ts`](../packages/client/ui-schedule/src/index.ts) |

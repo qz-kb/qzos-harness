@@ -4,6 +4,7 @@ import { Button, Input, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import { loginApi, loginSessionKey, loginRecord, loginRequest, storedLogin, LoginError, type LoginRecord } from './login-client.ts'
 import type { createQzosStore } from './store.ts'
+import { employeeHost } from './employee-host.ts'
 import css from './Login.module.css'
 
 /** Show server-configured login modes without replacing the Host access boundary. */
@@ -39,6 +40,8 @@ export function Login({ t, actions }: PropsLocale<'qzos'> & PropsStore<ReturnTyp
     }
     const profile = await loginRequest('/user/info', undefined, result.token, signal)
     if (signal.aborted) return
+    await employeeHost({ action: 'authorize', token: result.token }, signal)
+    signal.throwIfAborted()
     token.current = result.token
     sessionStorage.setItem(loginSessionKey, JSON.stringify({ api: loginApi, token: result.token }))
     actions.businessIdentity(String(profile.id)); setUser(profile); setPassword(''); setConfirmPassword(''); setCode(''); setMessage('')
@@ -60,6 +63,7 @@ export function Login({ t, actions }: PropsLocale<'qzos'> & PropsStore<ReturnTyp
         if (saved) {
           try {
             const profile = await loginRequest('/user/info', undefined, saved, controller.signal)
+            await employeeHost({ action: 'authorize', token: saved }, controller.signal)
             if (active()) { token.current = saved; actions.businessIdentity(String(profile.id)); setUser(profile) }
           } catch (failure) {
             if (active()) { if (failure instanceof LoginError && [-1, -2].includes(failure.code)) clear(); error(failure) }
@@ -101,7 +105,8 @@ export function Login({ t, actions }: PropsLocale<'qzos'> & PropsStore<ReturnTyp
     const check = () => {
       const saved = token.current
       if (!saved) return
-      void loginRequest('/user/info', undefined, saved, controller.signal).then((profile) => {
+      void loginRequest('/user/info', undefined, saved, controller.signal).then(async (profile) => {
+        await employeeHost({ action: 'authorize', token: saved }, controller.signal)
         if (!controller.signal.aborted && token.current === saved) setUser(profile)
       }).catch((failure: unknown) => {
         if (!controller.signal.aborted && token.current === saved) {
@@ -162,7 +167,12 @@ export function Login({ t, actions }: PropsLocale<'qzos'> & PropsStore<ReturnTyp
   const signOut = async () => {
     const saved = token.current
     clear(); setMessage(''); setBusy(true)
-    try { if (saved) await loginRequest('/login/logout', {}, saved, lifetime.current?.signal) }
+    try {
+      const results = await Promise.allSettled([employeeHost({ action: 'logout' }),
+        saved ? loginRequest('/login/logout', {}, saved, lifetime.current?.signal) : Promise.resolve(),
+      ])
+      if (results.some(result => result.status === 'rejected')) setMessage(t('loginLogoutUnknown'))
+    }
     catch { setMessage(t('loginLogoutUnknown')) }
     finally { setBusy(false) }
   }

@@ -1,0 +1,40 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/host/qzos-employees/README.md
+/:
+  en: f0050c0ba0963caa
+  zh: 6a9b0b3d247589db
+/qzos-employee-host-adapter:
+  en: e94b6418d759bfc9
+  zh: 99cd9dcf35405e7a
+/qzos-employee-host-adapter/summary:
+  en: 9ca30323904c0439
+  zh: 737d8b04a9a9ac1f
+/qzos-employee-host-adapter/table-of-contents:
+  en: 2b3672f743064614
+  zh: 75282f91d6c24b3d
+/qzos-employee-host-adapter/contract:
+  en: d892658ceda5e392
+  zh: 895adf96d2b560e9
+/qzos-employee-host-adapter/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/qzos-employee-host-adapter/model-experience/employee-knowledge:
+  en: bee2343a93669493
+  zh: a5d49aed6839ba70
+/qzos-employee-host-adapter/model-experience/employee-knowledge/what-the-model-sees:
+  en: c27aa4d01867bf6f
+  zh: 3b06d7a00637de75
+/qzos-employee-host-adapter/model-experience/employee-knowledge/token-effect:
+  en: c0f78ae87ea1fa5f
+  zh: 31dffcd4b5d4f8c9
+/qzos-employee-host-adapter/model-experience/employee-knowledge/kv-cache-effect:
+  en: 30be7ac0c3c4108f
+  zh: 4af48ce2b5b18293
+/qzos-employee-host-adapter/known-limitations-and-deferred-work:
+  en: c2e723bc7c2b85cf
+  zh: e63656c6ec7f6935
+/qzos-employee-host-adapter/known-limitations-and-deferred-work/dev-note:
+  en: 14e868b27714ee30
+  zh: 14d70e09d0fb4400

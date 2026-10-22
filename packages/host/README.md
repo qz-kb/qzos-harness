@@ -26,6 +26,7 @@ The packages play the host roles; each package README owns its contract and conf
 
 | Package | Role | ctx key |
 |---|---|---|
+| [`qzos-employees/`](qzos-employees/README.md) | Private QZOS employee binding and per-turn authorization | consumes `ctx.agents`, `ctx.storageDomain`, `ctx.webServer` |
 | [`webserver/`](webserver/README.md) | Browser HTTP server: named routes, upgrades, index taps, and the fallback seat | `ctx.webServer` |
 | [`frontend-static/`](frontend-static/README.md) | SPA dist server on the webserver fallback seat | consumes `ctx.webServer` |
 | [`directory-picker/`](directory-picker/README.md) | Workspace-directory picking seam: capability contract and error vocabulary | `ctx.directoryPicker` |

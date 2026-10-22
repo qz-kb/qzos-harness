@@ -11,6 +11,7 @@ import { createQzosStore } from './store.ts'
 import { panels } from './catalog.ts'
 import { en, zh, type QzosKey } from './locales.ts'
 import { installEmployeeMentions } from './employees.ts'
+import { installEmployeeContextPresentation } from './employee-context.tsx'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -19,7 +20,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 /** Native presentation and draft services; no employee business transport. */
-export const inject = ['slots', 'locale', 'layout', 'sessions', 'workspaces', 'conversation', 'inputTriggers', 'uiWorkspace', 'resources']
+export const inject = ['slots', 'locale', 'layout', 'sessions', 'workspaces', 'conversation', 'uiConversation', 'inputTriggers', 'uiWorkspace', 'resources']
 
 /** Register removable QZOS UI contributions.
  * @param ctx - Browser plugin context.
@@ -29,6 +30,7 @@ export function apply(ctx: Context): void {
   const t = ctx.locale.bind('qzos')
   const store = createQzosStore()
   installKnowledgeResources(ctx)
+  installEmployeeContextPresentation(ctx)
   const openEmployee = installEmployeeMentions(ctx, t)
   const developer = window.sessionStorage.getItem('qzos.preview') === '1'
   ctx.slots.inject('sidebar.brand.name', () => ctx.slots.register({ name: 'sidebar.brand.name', locale: 'qzos' }, Brand))

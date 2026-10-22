@@ -29,7 +29,7 @@ export function createQzosStore() {
       businessIdentity: (state, id: string | null) => {
         if (state.businessUser === id) return
         state.businessUser = id; state.businessEpoch++; state.knowledgeRevision++
-        state.details.knowledge = null
+        state.details.knowledge = null; state.details.employees = null; state.employees = []
       },
       refreshKnowledge: (state) => { state.knowledgeRevision++ },
       saveResource: (state, panel: 'knowledge' | 'employees', id: string | null, values: PreviewValues) => {

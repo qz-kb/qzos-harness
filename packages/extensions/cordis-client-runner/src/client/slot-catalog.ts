@@ -1914,7 +1914,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       'useAccess: (action: RemoteEndpoint) => boolean',
       'useTrajectory: UseTrajectory',
     ],
-    keyDomain: 'fixed by the owner\'s key table { [Id in UserTextId]: { node: UserTextNode<Id> } }, already taken: command, file, folder, secret, session, skill, text',
+    keyDomain: 'fixed by the owner\'s key table { [Id in UserTextId]: { node: UserTextNode<Id> } }, already taken: command, file, folder, qzos-employee-context, secret, session, skill, text',
     hookContext: '',
     slotInject: '',
     declaredBy: 'factory \'conversation.user.text\' (client-ui-conversation), so it exists while that definition is registered',
@@ -1922,6 +1922,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       'client-ui-conversation PlainUserText key \'text\'',
       'client-ui-conversation SessionReference key \'session\'',
       'client-ui-goal GoalCommandReference key \'command\'',
+      'client-ui-qzos EmployeeContextMarker key \'qzos-employee-context\'',
       'client-ui-reference FileReference key \'file\'',
       'client-ui-reference FolderReference key \'folder\'',
       'client-ui-secret-mask SecretText key \'secret\'',
@@ -2154,6 +2155,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [
       'client-ui-conversation ConversationPanel key \'conversation\'',
       'client-ui-plugin-manager PluginManagerPage',
+      'client-ui-qzos QzosPanel',
       'client-ui-schedule TaskManagerPage',
     ],
     replaceRisk: 'shadows-shipped-ui',
@@ -3388,6 +3390,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [
       'client-ui-chat QuotaNoticeHost id \'chat.quota-notice\'',
       'client-ui-plugin-manager PluginRefreshToast id \'plugin-manager.refresh-toast\'',
+      'client-ui-qzos Login id \'qzos-login\'',
       'client-ui-schedule ScheduleDeleteToast id \'schedule.delete-toast\'',
       'client-ui-settings-account DesktopOnboardingEntry id \'desktop-onboarding\'',
       'client-ui-settings-account AccountPlatformHost id \'account.platform-page\'',
@@ -3538,6 +3541,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     declaredBy: 'an entry in \'sidebar\' (client-ui-sidebar), so it exists while that entry is mounted',
     occupants: [
       'client-ui-brand-official OfficialBrandName',
+      'client-ui-qzos Brand',
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'sidebar.brand.name\', () => ctx.slots.register(\n      { name: \'sidebar.brand.name\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
@@ -3682,6 +3686,8 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     declaredBy: 'an entry in \'sidebar\' (client-ui-sidebar), so it exists while that entry is mounted',
     occupants: [
       'client-ui-plugin-manager PluginsPanelIcon',
+      'client-ui-qzos NativePanelIcon id \'conversation\'',
+      'client-ui-qzos PanelIcon',
       'client-ui-schedule TaskManagerIcon',
     ],
     replaceRisk: 'none',

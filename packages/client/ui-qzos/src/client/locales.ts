@@ -1,5 +1,12 @@
 /** Localized controls for QZOS resource previews. */
 export const zh = {
+  employeeLoading: '正在加载数字员工…',
+  employeeModelRequired: '请先配置并选择可用的员工模型，再保存完整配置。',
+  employeeWriteUnknown: '写入结果未确认，请刷新列表核对，勿重复创建。',
+  employeeUnsupported: '此能力尚未接入真实业务，未提交修改。',
+  employeeConversationReady: '已创建独立员工会话。填写任务后使用工作窗口所选模型执行，首次发送会读取员工配置和关联知识。',
+  employeeNewConversation: '请新建员工会话，不在已有会话中切换员工。',
+  employeeLeading: '请在新会话开头选择员工，再填写任务。',
   aclInactive: '已停用',
   aclSave: '保存规则',
   aclSubject: '授权对象',
@@ -427,6 +434,13 @@ export const zh = {
 } satisfies Record<string, string>
 export type QzosKey = keyof typeof zh
 export const en: Record<QzosKey, string> = {
+  employeeLoading: 'Loading employees…',
+  employeeModelRequired: 'Configure and select an employee model before saving.',
+  employeeWriteUnknown: 'Write outcome is unconfirmed. Refresh before creating again.',
+  employeeUnsupported: 'This capability is not connected. No changes were submitted.',
+  employeeConversationReady: 'Independent employee conversation ready. The work window’s selected model will execute the task; the first send reads employee settings and linked knowledge.',
+  employeeNewConversation: 'Start a new employee conversation instead of switching an existing conversation.',
+  employeeLeading: 'Select an employee at the beginning of a new conversation, then enter a task.',
   aclInactive: 'Inactive',
   aclSave: 'Save rule',
   aclSubject: 'Subject',
