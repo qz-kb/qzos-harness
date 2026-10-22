@@ -106,6 +106,13 @@ export function installKnowledgeResources(ctx: Context): void {
             value = { detail }; break
           }
           case 'files': value = { rows: await knowledgePages(`/kb.know/files?kb_id=${encodeURIComponent(id)}`, signal) }; break
+          case 'parse': {
+            const status = loginRecord(await knowledgeRequest(`/kb.teach/parseStatus?kb_id=${encodeURIComponent(id)}&fd_id=${encodeURIComponent(fd)}`, undefined, signal))
+            const processing = status.processing ? loginRecord(status.processing) : {}
+            const review = Array.isArray(processing.actions) && processing.actions.includes('review')
+              ? loginRecord(await knowledgeRequest(`/kb.teach/parseReview?kb_id=${encodeURIComponent(id)}&fd_id=${encodeURIComponent(fd)}&job_key=${encodeURIComponent(knowledgeText(status.job_key))}`, undefined, signal)) : null
+            value = { status, review }; break
+          }
           case 'fragments': value = { rows: await knowledgePages(`/kb.teach/datas?kb_id=${encodeURIComponent(id)}&fd_id=${encodeURIComponent(fd)}`, signal) }; break
           case 'members': value = { rows: knowledgeRows(await knowledgeRequest(`/kb.know/teamLists?kb_id=${encodeURIComponent(id)}`, undefined, signal)) }; break
           default: throw new Error('Unknown QZOS resource')
@@ -138,7 +145,7 @@ export function knowledgeDraft(row: LoginRecord): PreviewValues {
  * @returns Validated response or mapped presentation value.
  */
 export function knowledgeTable(rows: LoginRecord[], kind: 'files' | 'fragments' | 'members'): PreviewRow[] {
-  return rows.map(row => kind === 'files' ? { ...knowledgeDraft(row), id: knowledgeText(row.id), name: knowledgeText(row.name), waiting: knowledgeText(row.wait_sum ?? 0), trained: knowledgeText(row.ok_sum ?? 0), totalData: knowledgeText(row.total_sum ?? row.count ?? 0), createdAt: knowledgeText(row.create_time ?? ''), status: row.parse ? 'processing' : '' }
+  return rows.map(row => kind === 'files' ? { ...knowledgeDraft(row), id: knowledgeText(row.id), name: knowledgeText(row.name), waiting: knowledgeText(row.wait_sum ?? 0), trained: knowledgeText(row.ok_sum ?? 0), totalData: knowledgeText(row.total_sum ?? row.count ?? 0), createdAt: knowledgeText(row.create_time ?? ''), parseState: row.parse ? knowledgeText(loginRecord(row.parse).status_msg) : '', hasParse: row.parse ? '1' : '0', status: row.parse && [0, 1].includes(Number(loginRecord(row.parse).status)) ? 'processing' : '' }
     : kind === 'fragments' ? { ...knowledgeDraft(row), id: knowledgeText(row.uuid), name: knowledgeText(row.question ?? ''), status: Number(row.status) === 2 ? 'learned' : Number(row.status) === 3 ? 'failedLearn' : Number(row.status) === 1 ? 'learning' : 'waitingLearn', consumed: knowledgeText(row.tokens ?? 0), updatedAt: knowledgeText(row.update_time ?? '') }
       : { ...knowledgeDraft(row), id: knowledgeText(row.id), name: knowledgeText(row.nickname), role: Number(row.owned) === 1 ? 'owner' : 'member', power: Number(row.power) === 1 ? 'manage' : Number(row.power) === 2 ? 'edit' : 'view' })
 }
