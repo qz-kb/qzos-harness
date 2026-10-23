@@ -64,7 +64,6 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
   const knowledgeAction = draft.knowledge_dependency_action || 'preserve'
   const menusKey = `${item.id}:menus`
   const sharesKey = `${item.id}:${channel === 'api' ? 'apps' : 'shares'}`
-  const bindingsKey = `${item.id}:bindings`
   const dialoguesKey = `${item.id}:dialogues`
   const menus: PreviewRow[] = menuValues.map((row, index) => ({
     ...knowledgeDraft(row), id: String(index), name: knowledgeText(row.keyword),
@@ -134,6 +133,7 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
     {[publicationResource, recordResource, statsResource, keysResource].map((remote, index) => remote.status === 'failed' ? <p key={index} role="alert">{remote.failure?.message}</p> : null)}
     {notice && <p className={css.notice} role="status">{notice}</p>}
     {section === 'edit' && <>
+      <p className={css.notice}>{t('employeeWindowModel')}</p>
       <div className={css.tabs}>
         {tabList.map(([tab, label]) =>
           <Button key={tab} aria-pressed={editTab === tab} onClick={() =>{  setEditTab(tab) }}>{r(label)}</Button>)}
@@ -150,14 +150,14 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
         {knowledgeAction === 'replace' && <p>{t('employeeKnowledgeSelect')}</p>}
         {knowledgeAction === 'remove' && <p>{t('employeeKnowledgeRemoveHint')}</p>}
       </div>}
-      {editTab === 'bindings' ? <div className={css.inner}><div className={css.toolbar}><Button onClick={unsupported}>{r('bindSkill')}</Button><Button onClick={unsupported}>{r('bindPlugin')}</Button></div><ResourceTable r={r} rows={bindings} columns={[['name', 'bindingName'], ['kind', 'bindingStatus']]} actions={row => [{ label: 'delete', run: () =>{  setConfirmation({ key: bindingsKey, ids: [row.id] }) } }]} /></div>
-        : <>{editTab === 'employeeSearch' && <p className={css.notice}>{r('parameterNotice')}</p>}{editTab === 'employeeFlow' && <div className={css.notice}>{r('flowNotice')}<br />{r('flowNotice2')}</div>}
+      {editTab === 'bindings' ? <div className={css.inner}><div className={css.toolbar}><Button disabled>{r('bindSkill')}</Button><Button disabled>{r('bindPlugin')}</Button></div><p>{t('employeeBindingsUnavailable')}</p><ResourceTable r={r} rows={bindings} columns={[['name', 'bindingName'], ['kind', 'bindingStatus']]} /></div>
+        : <>{editTab === 'employeeFlow' && <p className={css.notice}>{t('employeeFlowUnavailable')}</p>}
           <ResourceFields t={t} form={editTab} draft={draft} knowledge={knowledge} options={modelOptions}
             onChange={update} editing disabled={busy} disabledFields={original.can_manage_knowledge_dependency === false || (rebindRequired && knowledgeAction !== 'replace') ? ['kb_ids'] : []} />
           {editTab === 'employeeBase' && <div className={css.inner}><p className={css.notice}>{r('helpRole')}</p></div>}
-          {editTab === 'employeeInterface' && <div className={css.menuEditor}><p className={css.notice}>{r('helpWelcome')}</p><h3>{r('menus')}</h3><ResourceTable rows={menus} r={r} columns={[['keyword', 'keywordLabel'], ['content', 'replyContent']]} actions={row => [{ label: 'view', run: () =>{  show('menu', row, true) } }, { label: 'edit', run: () =>{  show('menu', row) } }, { label: 'delete', run: () =>{  setConfirmation({ key: menusKey, ids: [row.id] }) } }]} /><Button variant="primary" disabled={menus.length >= 3} onClick={() =>{  show('menu') }}>+ {r('addMenu')}</Button><p className={css.notice}>{r('menuHint')}</p></div>}
+          {editTab === 'employeeInterface' && <div className={css.menuEditor}><h3>{r('menus')}</h3><ResourceTable rows={menus} r={r} columns={[['keyword', 'keywordLabel'], ['content', 'replyContent']]} actions={row => [{ label: 'view', run: () =>{  show('menu', row, true) } }, { label: 'edit', run: () =>{  show('menu', row) } }, { label: 'delete', run: () =>{  setConfirmation({ key: menusKey, ids: [row.id] }) } }]} /><Button variant="primary" disabled={menus.length >= 3} onClick={() =>{  show('menu') }}>+ {r('addMenu')}</Button><p className={css.notice}>{t('employeeSavedOnly')}</p></div>}
         </>}
-      <div className={css.formFooter}><Button variant="primary" disabled={busy || !draft.name?.trim() || (knowledgeAction === 'replace' && !draft.kb_ids)} onClick={() => {
+      <div className={css.formFooter}><Button variant="primary" disabled={busy || editTab === 'bindings' || !draft.name?.trim() || (knowledgeAction === 'replace' && !draft.kb_ids)} onClick={() => {
         if (knowledgeAction === 'remove') setConfirmKnowledgeRemoval(true)
         else saveConfiguration()
       }}>{r('save')}</Button></div>
