@@ -23,6 +23,8 @@ kind: "package-reference"
 
 Web bundle 挂载 `ui-qzos`，移除这一行即可恢复上游呈现。按根目录 `.node-version` 使用 Node，执行 `pnpm run dev:web --patch apps/web/tests/pin-browse-picker.overlay.yml --port 3081`；启动器参数须放在 Web 参数之前。
 
+企业托管模式下，私有 Host 注入 `__QZOS_MANAGED_ACCOUNT__`。业务请求使用相对文档基址的 `_qzos/business` 与同源 Cookie，不从浏览器存储恢复业务凭据。HTTP 401/403 返回企业登录入口；退出经网关调用 `_qzos/logout`。注入 ID 仅选择呈现方式，访问权限由网关及业务后端校验。
+
 知识库和员工页面依据现有 QZOS 客户端的 `qzos-pc/src/pages/application/layout/{kb,robot}.vue`、`application/kb/detail/`、`application/robot/setting.vue` 及其子视图还原。封面卡片、成员入口、员工头像与更多菜单、详情侧栏、新建字段和配置分组沿这些原页面；中文原文归语言字典，发布图标复用 QZOS 原资产。连接器、技能、模板继续沿 DSH 插件／自动化任务页面风格。
 
 知识库页面通过原生 `useResource` 读取本机 QZOS 列表、配置、资料、分段和成员，新增／修改／删除、重命名、分段操作、成员授权／移交与检索沿原接口。写入成功后回读，失败保留表单并显示后端原因；不再生成模拟资料或检索结果。业务身份切换会卸载知识库页面并隔离资源地址，令牌只进入本机 API 请求头。模型选项取自 `/index/models`，保持后端 readiness 限制。员工管理改用本机真实 API；连接器、技能和模板继续模拟。交互设施复用 DSH 原生弹窗、菜单和控件。
@@ -51,7 +53,7 @@ Web bundle 挂载 `ui-qzos`，移除这一行即可恢复上游呈现。按根�
 
 - 知识库由 QZOS 后端复核权限，员工 Host 绑定与逐轮上下文已接入；本机合成知识的真实回答与逐轮检索追问已验证。连接器授权、技能安装和模板应用尚未开放。覆盖桌面 Web 和窄窗口，Electron 未验证。
 
-当前账号接入仅指向本机 `qzos-login-test` 环境。找回密码、生产端点配置、短信／邮件送达和微信服务商验证不在已验证范围。本轮是业务登录，不是 DSH 文件、会话或工具的多用户隔离。
+非托管预览指向本机 `qzos-login-test` 环境；企业托管模式使用部署网关。找回密码、生产端点配置、短信／邮件送达和微信服务商验证不在已验证范围。UI 本身不隔离 DSH 文件、会话或工具；托管部署须为每个用户提供独立 Host 和执行环境。
 
 私有插件通过原生 shell overlay 挂载全屏登录／注册页，未登录时先显示该页；左侧不增加账号模块。登录后进入工作界面，退出或经服务端确认的过期回到登录页。此展示不新增 DSH Host 的多用户授权能力。
 

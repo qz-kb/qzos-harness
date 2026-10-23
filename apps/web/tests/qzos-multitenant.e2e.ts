@@ -35,7 +35,7 @@ async function employee(host: WebScaffold, input: object) {
 
 it('rejects foreign Host credentials and QZOS accounts while keeping native histories separate', async () => {
   const root = await mkdtemp(join(tmpdir(),'qzos-multitenant-'))
-  const tokens = [randomUUID(),randomUUID()]
+  const tokens: string[] = [randomUUID(),randomUUID()]
   const searches: number[] = []
   let revoked = false
   const backend = createServer(async (req,res) => {

@@ -43,8 +43,11 @@ it.each([undefined, '1'])('persists bindings and checks account changes with Hos
     ctx.provide('storageDomain',new DomainFacility(ctx,{ backend:'memory',routes:{} }))
     await ctx.plugin(WebServer,{ host:'127.0.0.1',port:0 })
     const baseConfig = { apiUrl:'http://qzos.invalid/api',requestTimeoutMs:1000 }
-    const config = { ...baseConfig, ...(ownerUserId === undefined ? {} : { ownerUserId }) }
+    const config = { ...baseConfig, ...(ownerUserId === undefined ? {} : { ownerUserId, managedGateway:true }) }
     let plugin = ctx.plugin(Employees,config); await plugin.await()
+    const injected: import('@deepseek-ai/dsh-host-webserver').IndexInjection[] = []
+    ctx.emit('webserver/index-inject', injected)
+    expect(injected).toEqual(ownerUserId ? [{ kind:'global',name:'__QZOS_MANAGED_ACCOUNT__',value:ownerUserId }] : [])
     const call = async (body: object) => nativeFetch(`${ctx.webServer.getOrigin()}/qzos/employees`,{ method:'POST',headers:{ 'Content-Type':'application/json' },body:JSON.stringify(body) })
     rejected=true; expect((await call({ action:'logout' })).status).toBe(403); rejected=false
     expect((await call({ action:'bind',token:'synthetic',sessionId:agent.session.id,employeeId:'7' })).status).toBe(200)
@@ -92,6 +95,9 @@ it.each([undefined, '1'])('persists bindings and checks account changes with Hos
       await expect(wrong.await()).rejects.toThrow('another account')
       await wrong.dispose()
     }
+    const unmanaged = ctx.plugin(Employees,{ ...baseConfig,managedGateway:true })
+    await expect(unmanaged.await()).rejects.toThrow('requires an owner')
+    await unmanaged.dispose()
     for (const invalid of ['', '0', '01', 'abc']) {
       const wrong = ctx.plugin(Employees,{ ...baseConfig,ownerUserId:invalid })
       await expect(wrong.await()).rejects.toThrow('Invalid QZOS Host owner')

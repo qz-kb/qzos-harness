@@ -2611,6 +2611,8 @@ export type Config = LocalConfig
 export interface Config extends BusinessConfig {
   /** Backend user ID assigned to a dedicated Host; never supplied by the browser. */
   ownerUserId?: string
+  /** Serve private UI through the authenticated enterprise gateway. Requires ownerUserId. */
+  managedGateway?: boolean
 }
 
 /** Fixed backend origin and request deadline supplied by the plugin configuration. */

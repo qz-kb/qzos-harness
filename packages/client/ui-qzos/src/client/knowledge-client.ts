@@ -1,7 +1,7 @@
 /** QZOS knowledge transport and native DSH resource provider. */
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-resources/client'
-import { loginApi, loginRecord, storedLogin, LoginError, type LoginRecord } from './login-client.ts'
+import { loginApi, loginCredentials, managedAccount, loginRecord, storedLogin, LoginError, type LoginRecord } from './login-client.ts'
 import type { Example } from './catalog.ts'
 import type { PreviewRow } from './resource-fixtures.ts'
 import type { PreviewValues } from './resource-schema.ts'
@@ -40,11 +40,12 @@ export async function knowledgeRequest(
   if (expectedToken !== undefined && expectedToken !== token) throw new LoginError('登录账号已变更，请重新打开页面', -1)
   if (!token) throw new LoginError('请先登录 QZOS', -1)
   const response = await fetch(`${loginApi}${path}`, {
-    method: body ? 'POST' : 'GET', credentials: 'omit', redirect: 'error', cache: 'no-store',
+    method: body ? 'POST' : 'GET', credentials: loginCredentials, redirect: 'error', cache: 'no-store',
     headers: { terminal: '4', version: '4.8.0', token, ...body instanceof FormData ? {} : { 'Content-Type': 'application/json' } },
     ...body ? { body: body instanceof FormData ? body : JSON.stringify(body) } : {},
     signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(60000)]) : AbortSignal.timeout(60000),
   })
+  if (managedAccount && [401, 403].includes(response.status)) globalThis.location.assign('/')
   if (storedLogin(sessionStorage) !== token) throw new LoginError('登录账号已变更，请重新打开页面', -1)
   const result = loginRecord(await response.json().catch(() => { throw new Error(`QZOS HTTP ${response.status}`) }))
   if (!response.ok && typeof result.msg !== 'string') throw new Error(`QZOS HTTP ${response.status}`)

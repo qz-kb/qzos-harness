@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { loginApi, loginRequest, loginSessionKey, LoginError, storedLogin } from '../src/client/login-client.ts'
 
-afterEach(() => { vi.unstubAllGlobals() })
+afterEach(() => { vi.unstubAllGlobals(); vi.resetModules() })
 it('keeps QZOS credentials separate from Host cookies and handles business rejection', async () => {
   const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 1, data: { token: 'synthetic' } })))
   vi.stubGlobal('fetch', fetcher)
@@ -33,4 +33,24 @@ it('restores only credentials owned by the selected business API', () => {
   expect(storedLogin(storage)).toBeUndefined()
   getItem.mockReturnValue('broken')
   expect(storedLogin(storage)).toBeUndefined()
+})
+
+it('uses managed gateway cookies without reading a browser business credential', async () => {
+  vi.resetModules()
+  vi.stubGlobal('__QZOS_MANAGED_ACCOUNT__', '42')
+  vi.stubGlobal('document', { baseURI: 'https://work.invalid/u/42/' })
+  const assign = vi.fn()
+  vi.stubGlobal('location', { assign })
+  const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 1, data: { id: 42 } })))
+  vi.stubGlobal('fetch', fetcher)
+  const managed = await import('../src/client/login-client.ts')
+  const getItem = vi.fn()
+  expect(managed.storedLogin({ getItem } as unknown as Storage)).toBe('managed:42')
+  expect(getItem).not.toHaveBeenCalled()
+  expect(await managed.loginRequest('/user/info')).toEqual({ id: 42 })
+  expect(fetcher.mock.calls[0]?.[0]).toBe('https://work.invalid/u/42/_qzos/business/user/info')
+  expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ credentials: 'same-origin' })
+  fetcher.mockResolvedValue(new Response('{}', { status: 401 }))
+  await expect(managed.loginRequest('/user/info')).rejects.toThrow('HTTP 401')
+  expect(assign).toHaveBeenCalledWith('/')
 })

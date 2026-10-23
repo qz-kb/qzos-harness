@@ -21,11 +21,13 @@ declare module '@deepseek-ai/dsh-llm' {
 export interface Config extends BusinessConfig {
   /** Backend user ID assigned to a dedicated Host; never supplied by the browser. */
   ownerUserId?: string
+  /** Serve private UI through the authenticated enterprise gateway. Requires ownerUserId. */
+  managedGateway?: boolean
 }
 /** Plugin configuration; the composition owns endpoint and timeout choices. */
 export const Config: schema<Config> = schema.object({
   apiUrl: schema.string().required(), requestTimeoutMs: schema.natural().min(1).required(),
-  ownerUserId: schema.string(),
+  ownerUserId: schema.string(), managedGateway: schema.boolean(),
 })
 /** Services used by this host-only plugin. */
 export const inject = ['webServer', 'connection', 'agents', 'storageDomain']
@@ -52,6 +54,12 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   const url = new URL(config.apiUrl)
   if (url.username || url.password || url.search || url.hash || !['http:', 'https:'].includes(url.protocol)) throw new Error('Invalid QZOS API URL')
   if (config.ownerUserId !== undefined && !/^[1-9]\d*$/.test(config.ownerUserId)) throw new Error('Invalid QZOS Host owner')
+  if (config.managedGateway) {
+    if (!config.ownerUserId) throw new Error('Managed QZOS Host requires an owner')
+    ctx.on('webserver/index-inject', (table) => {
+      table.push({ kind: 'global', name: '__QZOS_MANAGED_ACCOUNT__', value: config.ownerUserId })
+    })
+  }
   const ownerDomain = await ctx.storageDomain.open(ownerSpec)
   ctx.effect(() => () => ownerDomain.close(), 'QZOS Host assignment lifetime')
   const assignment = ownerDomain.table('assignment')
