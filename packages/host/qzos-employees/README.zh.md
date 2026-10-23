@@ -61,3 +61,5 @@ Web 组合与 ui-qzos 一起加载本私有插件。`apiUrl` 指定本机 QZOS A
 </details>
 
 每条已授权片段保留白名单内的文件编号、名称、版本、片段编号及 QZOS 验证的解析坐标。记录到 Session 的上下文要求模型引用这些字段，不编造缺失位置。原生 Chat 继续隐藏上下文消息，并显示回答中的可读引用。
+
+可选真实撤权测试 `tests/access-live.spec.ts` 使用 `QZOS_LIVE_ACCESS_DIR` 指定本机隔离合成夹具目录。目录需有 `member-account.json`、`member.json`、`access-state.json`（kb_id、employee、rule、body、url）和 `correction.pdf`，父目录为已有 owner `account.json`。测试独占夹具锁，真实登录并在同一绑定 Agent 内验证引用撤权／恢复、移除成员后的下一轮拒绝和原件下载拒绝；退出恢复合成成员与授予规则并释放 Host。仅对明确准备的可变合成夹具启用，不创建语言模型调用。

@@ -12,6 +12,7 @@ import { resourceCopy, type ResourceText } from './resource-copy.ts'
 import { knowledgeRequest as requestKnowledge, knowledgeRows, knowledgeText, knowledgeSearchInput, knowledgeDraft, knowledgeTable, saveKnowledge } from './knowledge-client.ts'
 import { loginRecord, storedLogin } from './login-client.ts'
 import { KnowledgeParse } from './KnowledgeParse.tsx'
+import { KnowledgeFile } from './KnowledgeFile.tsx'
 import { KnowledgeAcl } from './KnowledgeAcl.tsx'
 import { sourceCitation } from './knowledge-source.ts'
 import css from './Resources.module.css'
@@ -49,6 +50,7 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
   const [importType, setImportType] = useState('docImport')
   const [files, setFiles] = useState<File[]>([])
   const imports = useRef(new Map<File, Record<string, unknown>>())
+  const [accessFile, setAccessFile] = useState<PreviewRow | null>(null)
   const [parseFile, setParseFile] = useState<PreviewRow | null>(null)
   const [versionTarget, setVersionTarget] = useState<PreviewRow | null>(null)
   const [urls, setUrls] = useState('')
@@ -181,6 +183,8 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
   const dialogForm: ResourceForm = dialog?.kind === 'member' ? 'member' : dialog?.kind === 'parameters' ? 'searchParameters' : 'fragment'
 
   return <div className={css.inner} aria-busy={busy}>
+    {accessFile && <KnowledgeFile {...props} fd={accessFile.id} name={accessFile.name}
+      onClose={() => { setAccessFile(null); refresh() }} onChanged={refresh} />}
     {parseFile && <KnowledgeParse {...props} kb={item.id} fd={parseFile.id} name={parseFile.name} editable={editable}
       onChanged={refresh} onClose={() => { setParseFile(null); refresh() }} />}
     {[documentsResource, fragmentsResource, membersResource].map((resource, index) => resource.status === 'failed' ? <p key={index} role="alert">{resource.failure?.message}<Button onClick={refresh}>{r('refresh')}</Button></p> : null)}
@@ -190,6 +194,7 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
         <div className={css.toolbar}><div className={css.inline}><Button variant="primary" disabled={busy || !editable} onClick={() =>{  setVersionTarget(null); setFiles([]); imports.current.clear(); setMode('import') }}>{r('importData')}</Button><Button aria-label={r('refresh')} onClick={() => { setQuery(''); setSearch(''); refresh() }}><IconRefreshOutlineRegular size={18} /></Button></div><div className={css.inline}><Input aria-label={r('keyword')} placeholder={r('keyword')} value={query} onChange={(event) =>{  setQuery(event.target.value) }} onKeyDown={(event) => { if (event.key === 'Enter') setSearch(query) }} /><Button variant="primary" onClick={() =>{  setSearch(query) }}>{r('query')}</Button><Button onClick={() => { setQuery(''); setSearch('') }}>{r('reset')}</Button></div></div>
         <ResourceTable rows={filteredDocuments} r={r} columns={[['name', 'name'], ['parseState', 'parseStatus'], ['waiting', 'waiting'], ['trained', 'trained'], ['totalData', 'totalData'], ['createdAt', 'createdAt']]} onOpen={openDocument}
           actions={row => [
+            { label: 'fileAccess' as const, run: () => { setAccessFile(row) } },
             ...row.hasParse === '1' ? [{ label: 'parseStatus' as const, run: () => { setParseFile(row) } }] : [],
             ...owned && row.is_default !== '1' ? [{ label: 'uploadVersion' as const, run: () => { setMode('import'); setImportType('docImport'); setFiles([]); imports.current.clear(); setVersionTarget(row) } }] : [],
             { label: 'rename', disabled: !owned, run: () =>{  show('rename', row) } },

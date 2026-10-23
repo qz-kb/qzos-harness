@@ -106,6 +106,11 @@ export function installKnowledgeResources(ctx: Context): void {
             value = { detail }; break
           }
           case 'files': value = { rows: await knowledgePages(`/kb.know/files?kb_id=${encodeURIComponent(id)}`, signal) }; break
+          case 'file': {
+            value = loginRecord(await knowledgeRequest(`/kb.file_gateway/original?fd_id=${encodeURIComponent(fd)}`, undefined, signal))
+            if (value.can_edit === true) value.lifecycle = loginRecord(await knowledgeRequest(`/kb.lifecycle/detail?fd_id=${encodeURIComponent(fd)}`, undefined, signal))
+            break
+          }
           case 'parse': {
             const status = loginRecord(await knowledgeRequest(`/kb.teach/parseStatus?kb_id=${encodeURIComponent(id)}&fd_id=${encodeURIComponent(fd)}`, undefined, signal))
             const processing = status.processing ? loginRecord(status.processing) : {}

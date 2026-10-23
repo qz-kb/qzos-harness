@@ -57,3 +57,5 @@ Verification details are maintained in the original Product task.
 </details>
 
 Each authorized excerpt retains allowlisted file identity, name, version, fragment ID and verified parse coordinates from QZOS. The logged context asks the model to cite these fields and never invent missing locations. Native Chat continues to hide the context message; readable answer citations remain visible.
+
+The opt-in `tests/access-live.spec.ts` takes `QZOS_LIVE_ACCESS_DIR`, a prepared local synthetic fixture directory containing `member-account.json`, `member.json`, `access-state.json` (kb_id, employee, rule, body, url), and `correction.pdf`; its parent contains the existing owner `account.json`. The test locks the fixture, logs in normally, and checks reference revocation/restoration, membership removal on the next step of the same bound agent, and original-download rejection. Teardown restores synthetic membership and grants and disposes the Host. Enable only against an explicitly prepared mutable synthetic fixture. No language model call is made.
