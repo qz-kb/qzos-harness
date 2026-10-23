@@ -7,6 +7,8 @@ import { catalogs, type Example } from './catalog.ts'
 import type { PreviewRow } from './resource-fixtures.ts'
 import { resourceDraft, type PreviewValues, type ResourceForm } from './resource-schema.ts'
 import { EmployeeBindings } from './EmployeeBindings.tsx'
+import { EmployeePublication } from './EmployeePublication.tsx'
+import { publicationUrl } from './publication-client.ts'
 import { EmployeeSquare } from './EmployeeSquare.tsx'
 import { ResourceFields } from './ResourceForms.tsx'
 import { ResourceTable } from './ResourceTable.tsx'
@@ -15,7 +17,7 @@ import css from './Resources.module.css'
 import { publicationArtwork } from './resource-artwork.ts'
 import { employeeDraft, saveEmployee } from './employee-client.ts'
 import { knowledgeDraft, knowledgeRows, knowledgeText, knowledgeRequest } from './knowledge-client.ts'
-import { loginRecord, storedLogin, type LoginRecord } from './login-client.ts'
+import { loginApi, loginRecord, storedLogin, type LoginRecord } from './login-client.ts'
 import type { QzosKey } from './locales.ts'
 
 const emptyRows: readonly PreviewRow[] = []
@@ -38,7 +40,7 @@ export function EmployeeDetail(props: EmployeeDetailProps) {
   return <EmployeeContent key={`${props.item.id}:${revision}`} {...props} original={loginRecord(remote.value.detail)} />
 }
 function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord }) {
-  const { item, section, useStore, useResource, t, openEmployee, onSaved, knowledge, modelOptions, original } = props
+  const { item, section, useStore, useResource, t, onSaved, knowledge, modelOptions, original } = props
   const r = (key: ResourceText) => key === 'saved' ? t('kbSaved') : t(resourceCopy[key])
   const [lifetime] = useState(() => new AbortController())
   const token = useRef(storedLogin(sessionStorage))
@@ -52,6 +54,8 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
   const [draft, setDraft] = useState(() => employeeDraft(original))
   const [menuValues, setMenuValues] = useState(() => knowledgeRows(original.menus))
   const [channel, setChannel] = useState('')
+  const publicationType = channel === 'api' ? 4 : channel === 'js' ? 2 : 1
+  const [publicArtifact, setPublicArtifact] = useState<{ row: PreviewRow; poster: boolean } | null>(null)
   const [dialogueTab, setDialogueTab] = useState('data')
   const [feedbackFilter, setFeedbackFilter] = useState('all')
   const [selected, setSelected] = useState<string[]>([])
@@ -72,7 +76,7 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
     ...knowledgeDraft(row), id: String(index), name: knowledgeText(row.keyword),
   }))
   const query = `id=${item.id}&epoch=${epoch}&revision=${revision}`
-  const publicationResource = useResource<'qzos-knowledge'>(section === 'release' && channel ? `dsh-resource://qzos-knowledge/employee-publications?${query}&type=${channel === 'api' ? 4 : 1}` : '')
+  const publicationResource = useResource<'qzos-knowledge'>(section === 'release' && channel ? `dsh-resource://qzos-knowledge/employee-publications?${query}&type=${publicationType}` : '')
   const recordResource = useResource<'qzos-knowledge'>(section === 'dialogue' ? `dsh-resource://qzos-knowledge/employee-records?${query}` : '')
   const feedbackResource = useResource<'qzos-knowledge'>(section === 'dialogue' ? `dsh-resource://qzos-knowledge/employee-feedback?${query}` : '')
   const statsResource = useResource<'qzos-knowledge'>(section === 'dialogue' ? `dsh-resource://qzos-knowledge/employee-stats?${query}` : '')
@@ -108,7 +112,7 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
       setDialog(null); return
     }
     if (dialog.kind === 'share' || dialog.kind === 'api') {
-      await request(dialog.row ? '/kb.share/update' : '/kb.share/add', { ...dialog.row ? { id: Number(dialog.row.id) } : { robot_id: Number(item.id), type: channel === 'api' ? 4 : 1 }, name: dialogDraft.name, ...dialogDraft.password ? { password: dialogDraft.password } : {} })
+      await request(dialog.row ? '/kb.share/update' : '/kb.share/add', { ...dialog.row ? { id: Number(dialog.row.id) } : { robot_id: Number(item.id), type: publicationType }, name: dialogDraft.name, ...dialogDraft.password ? { password: dialogDraft.password } : {} })
     } else if (dialog.kind === 'quota' && dialog.row) {
       await request('/kb.share/edit', { id: Number(dialog.row.id), limit_today_chat: Number(dialogDraft.quotaDaily), limit_total_chat: Number(dialogDraft.quotaTotal) })
     } else if (dialog.kind === 'feedback' && dialog.row) {
@@ -122,7 +126,7 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
     if (!confirmation) return
     if (confirmation.key === menusKey) setMenuValues(current => current.filter((_, index) => !confirmation.ids.includes(String(index))))
     else if (confirmation.key === dialoguesKey) await request('/kb.chat/dataDelete', { robot_id: Number(item.id), ids: confirmation.ids.map(Number) })
-    else if (confirmation.key === sharesKey) for (const id of confirmation.ids) await request('/kb.share/del', { id: Number(id), type: channel === 'api' ? 4 : 1 })
+    else if (confirmation.key === sharesKey) for (const id of confirmation.ids) await request('/kb.share/del', { id: Number(id), type: publicationType })
     else { unsupported(); return }
     setConfirmation(null); setSelected([]); refresh()
   }) }
@@ -135,6 +139,7 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
   const tabList: readonly [ResourceForm | 'bindings', ResourceText][] = [['employeeBase', 'base'], ['bindings', 'skillBindings'], ['employeeSearch', 'modelSearch'], ['employeeInterface', 'interface']]
   const platformGroups: readonly [ResourceText, readonly ResourceText[]][] = [['webapp', ['web', 'js', 'oa', 'poster']], ['apiAccess', ['api', 'qwx', 'rpa']]]
   return <div className={css.employeeDetail} aria-busy={busy}>
+    {publicArtifact && <EmployeePublication t={t} publicId={publicArtifact.row.entryId ?? ''} type={Number(publicArtifact.row.type)} name={item.title} poster={publicArtifact.poster} onClose={() => { setPublicArtifact(null) }} />}
     {sharing && <EmployeeSquare {...props} employeeId={item.id} onClose={() => { setSharing(false); onSaved() }} />}
     <Button onClick={() => { setSharing(true) }}>{t('employeeShare')}</Button>
     {[publicationResource, recordResource, statsResource, keysResource, feedbackResource].map((remote, index) => remote.status === 'failed' ? <p key={index} role="alert">{remote.failure?.message}</p> : null)}
@@ -174,12 +179,11 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
       <div className={css.toolbar}><div className={css.inline}><Button disabled={busy} onClick={() => { void perform(async () => { await request('/kb.publish/employeeState', { robot_id: Number(item.id), state: 'ready' }); onSaved() }) }}>{r('onDuty')}</Button><Button disabled={busy} onClick={() => { void perform(async () => { await request('/kb.publish/employeeState', { robot_id: Number(item.id), state: 'paused' }); onSaved() }) }}>{r('pauseEmployee')}</Button></div></div>
       {!channel ? platformGroups.map(([group, platforms]) => <div key={group}><h3>{r(group)}</h3><div className={css.platformGrid}>{platforms.map(platform => <button type="button" key={platform} disabled={['oa', 'qwx', 'rpa'].includes(platform)} onClick={() =>{  setChannel(platform === 'poster' ? 'web' : platform) }}><img src={publicationArtwork[platform as keyof typeof publicationArtwork]} alt="" /><span>{r(platform)}<small>{t(`pcPlatform${platform}` as QzosKey)}</small>{['oa', 'qwx', 'rpa'].includes(platform) && <small>{r('comingSoon')}</small>}</span></button>)}</div></div>)
         : <><Button onClick={() =>{  setChannel('') }}><IconChevronLeftOutlineRegular size={16} />{r(channel === 'api' ? 'api' : channel === 'js' ? 'js' : 'web')}</Button><p className={css.notice}>{r('webHint')}</p>
-          {channel === 'js' && <p className={css.notice}>{t('employeeUnsupported')}</p>}
           <div className={css.toolbar}><Button variant="primary" disabled={busy} onClick={() => { show(channel === 'api' ? 'api' : 'share') }}>{r(channel === 'api' ? 'createApi' : 'createLink')}</Button></div>
           <ResourceTable rows={shares} r={r} columns={channel === 'api' ? [['status', 'status'], ['key', 'appSecret'], ['name', 'name'], ['lastUsed', 'lastUsed']] : [['status', 'status'], ['entryId', 'entryId'], ['name', 'shareName'], ['password', 'password'], ['mode', 'mode'], ['lastUsed', 'lastUsed']]}
             cell={(row, key) => key === 'status' ? r(row.status === 'enabled' ? 'enabled' : 'disabled') : key === 'password' ? row.password ? '••••••' : '—' : row[key] ?? '—'} actions={row => [
               { label: row.status === 'enabled' ? 'deactivate' : 'enabled', run: () => { void perform(async () => { await request('/kb.publish/manage', { id: Number(row.id), action: row.status === 'enabled' ? 'disable' : 'enable' }); refresh() }) } },
-              ...channel === 'api' ? [{ label: 'manageKeys' as const, run: () =>{  show('keys', row) } }] : [{ label: 'copyLink' as const, run: unsupported }, { label: 'edit' as const, run: () =>{  show('share', row) } }, { label: 'preview' as const, run: () => { void openEmployee(item.id, item.title).then((message) => { if (message) setNotice(message) }) } }, { label: 'generatePoster' as const, run: unsupported }],
+              ...channel === 'api' ? [{ label: 'manageKeys' as const, run: () =>{  show('keys', row) } }] : [{ label: 'copyLink' as const, run: () => { void perform(async () => { await navigator.clipboard.writeText(publicationUrl(loginApi, row.entryId ?? '', Number(row.type))); setNotice(t('publicationCopied')) }) } }, { label: 'edit' as const, run: () =>{  show('share', row) } }, { label: 'preview' as const, run: () => { setPublicArtifact({ row, poster: false }) } }, ...channel === 'js' ? [{ label: 'js' as const, run: () => { setPublicArtifact({ row, poster: false }) } }] : [{ label: 'generatePoster' as const, run: () => { setPublicArtifact({ row, poster: true }) } }]],
               { label: 'usageSettings', run: () =>{  show('quota', row) } }, { label: 'delete', run: () =>{  setConfirmation({ key: sharesKey, ids: [row.id] }) } },
             ]} />
         </>}

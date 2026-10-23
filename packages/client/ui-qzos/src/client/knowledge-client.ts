@@ -121,7 +121,7 @@ export function installKnowledgeResources(ctx: Context): void {
             value = loginRecord(await knowledgeRequest(`/v1/kb/feedback/summary?robot_id=${encodeURIComponent(id)}&from=${to - 30 * 86400}&to=${to}`, undefined, signal)); break
           }
           case 'employee-records': value = { rows: await knowledgePages(`/kb.chat/dataRecord?robot_id=${encodeURIComponent(id)}&is_feedback=-1`, signal) }; break
-          case 'employee-publications': value = { rows: await knowledgePages(`/kb.share/lists?robot_id=${encodeURIComponent(id)}&type=${url.searchParams.get('type') === '4' ? 4 : 1}`, signal) }; break
+          case 'employee-publications': value = { rows: await knowledgePages(`/kb.share/lists?robot_id=${encodeURIComponent(id)}&type=${['1', '2', '4'].includes(url.searchParams.get('type') ?? '') ? url.searchParams.get('type') : 1}`, signal) }; break
           case 'acl': {
             const [rows, subjects] = await Promise.all([
               knowledgeRequest(`/kb.documentAcl/rules?fd_id=${encodeURIComponent(fd)}`, undefined, signal),
