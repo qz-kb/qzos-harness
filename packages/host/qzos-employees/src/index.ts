@@ -17,16 +17,26 @@ declare module '@deepseek-ai/dsh-llm' {
   }
 }
 
-/** Explicit local QZOS endpoint configuration. */
-export type Config = BusinessConfig
+/** Explicit QZOS endpoint and optional deployment-owned account assignment. */
+export interface Config extends BusinessConfig {
+  /** Backend user ID assigned to a dedicated Host; never supplied by the browser. */
+  ownerUserId?: string
+}
 /** Plugin configuration; the composition owns endpoint and timeout choices. */
 export const Config: schema<Config> = schema.object({
   apiUrl: schema.string().required(), requestTimeoutMs: schema.natural().min(1).required(),
+  ownerUserId: schema.string(),
 })
 /** Services used by this host-only plugin. */
 export const inject = ['webServer', 'connection', 'agents', 'storageDomain']
 const bindingSchema = z.object({ userId: z.string(), employeeId: z.string(), apiUrl: z.string() })
 const spec = defineDomain({ name: 'qzos_employees', version: 1, tables: { bindings: domainTable(bindingSchema) } })
+const ownerSpec = defineDomain({ name: 'qzos_host_owner', version: 1, tables: {
+  assignment: domainTable(z.object({ userId: z.string(), apiUrl: z.string() })),
+} })
+class AccountMismatch extends Error {
+  constructor() { super('此工作空间属于其他 QZOS 账号，请打开你自己的工作空间') }
+}
 const inputSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('authorize'), token: z.string().min(1) }),
   z.object({ action: z.literal('logout') }),
@@ -41,8 +51,25 @@ interface Connection { requestRejection(request: { headers: IncomingMessage['hea
 export async function apply(ctx: Context, config: Config): Promise<void> {
   const url = new URL(config.apiUrl)
   if (url.username || url.password || url.search || url.hash || !['http:', 'https:'].includes(url.protocol)) throw new Error('Invalid QZOS API URL')
+  if (config.ownerUserId !== undefined && !/^[1-9]\d*$/.test(config.ownerUserId)) throw new Error('Invalid QZOS Host owner')
+  const ownerDomain = await ctx.storageDomain.open(ownerSpec)
+  ctx.effect(() => () => ownerDomain.close(), 'QZOS Host assignment lifetime')
+  const assignment = ownerDomain.table('assignment')
+  const storedOwner = assignment.get('owner')
+  if (storedOwner && (storedOwner.userId !== config.ownerUserId || storedOwner.apiUrl !== config.apiUrl)) {
+    throw new Error('QZOS Host assignment differs from stored owner; use a separate Host data directory')
+  }
   const domain = await ctx.storageDomain.open(spec)
+  ctx.effect(() => () => domain.close(), 'QZOS employee bindings lifetime')
   const bindings = domain.table('bindings')
+  if (config.ownerUserId !== undefined) {
+    for (const [, binding] of bindings.entries()) {
+      if (binding.userId !== config.ownerUserId || binding.apiUrl !== config.apiUrl) {
+        throw new Error('QZOS Host contains bindings for another account; migration is required')
+      }
+    }
+    if (!storedOwner) await assignment.put('owner', { userId: config.ownerUserId, apiUrl: config.apiUrl })
+  }
   let active: { userId: string; token: string } | undefined
   let mutation = Promise.resolve()
   const pending = new Map<string, Promise<void>>()
@@ -59,7 +86,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     revoke(); active = { userId: owner, token }
   }
   const lifetime = new AbortController()
-  ctx.effect(() => () => { revoke(); lifetime.abort(); return domain.close() }, 'QZOS employee lifetime')
+  ctx.effect(() => () => { revoke(); lifetime.abort() }, 'QZOS employee lifetime')
   const connection = Reflect.get(ctx, 'connection') as Connection
   ctx.effect(() => ctx.webServer.register({ kind: 'exact', path: '/qzos/employees', handler: async (req, res) => {
     const rejection = connection.requestRejection(req)
@@ -79,6 +106,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
       const operation = mutation.then(async () => {
         if (input.action === 'logout') { revoke(); return }
         const owner = await userId(config, input.token, lifetime.signal)
+        if (config.ownerUserId !== undefined && owner !== config.ownerUserId) throw new AccountMismatch()
         if (input.action === 'authorize') { activate(owner, input.token); return }
         const sessionId = input.sessionId as SessionId
         const agent = ctx.agents.get(sessionId)
@@ -98,8 +126,8 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
       }
       res.end(JSON.stringify({ ok: true }))
     } catch (error) {
-      res.statusCode = 400
-      res.end(JSON.stringify({ ok: false, message: error instanceof z.ZodError ? 'Invalid employee request' : error instanceof Error ? error.message : 'Employee request failed' }))
+      res.statusCode = error instanceof AccountMismatch ? 403 : 400
+      res.end(JSON.stringify({ ok: false, ...(error instanceof AccountMismatch ? { code: 'QZOS_HOST_ACCOUNT_MISMATCH' } : {}), message: error instanceof z.ZodError ? 'Invalid employee request' : error instanceof Error ? error.message : 'Employee request failed' }))
     }
   } }), 'QZOS employee authenticated route')
   // Native forks inherit the same immutable owner/employee binding, including nested forks.

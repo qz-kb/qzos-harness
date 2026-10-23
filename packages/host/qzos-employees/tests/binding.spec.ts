@@ -10,7 +10,7 @@ import { MemoryStorageBackend } from '../../../storage/storage-domain/tests/help
 import { expect, it, vi } from 'vitest'
 import * as Employees from '../src/index.ts'
 
-it('persists bindings across reload, rechecks each turn, and refuses another account or logout', async () => {
+it.each([undefined, '1'])('persists bindings and checks account changes with Host owner %s', async (ownerUserId) => {
   const ctx = new Context()
   const nativeFetch = fetch
   let owner = '1'
@@ -42,7 +42,8 @@ it('persists bindings across reload, rechecks each turn, and refuses another acc
     ctx.storage.backend.register('memory',new MemoryStorageBackend())
     ctx.provide('storageDomain',new DomainFacility(ctx,{ backend:'memory',routes:{} }))
     await ctx.plugin(WebServer,{ host:'127.0.0.1',port:0 })
-    const config = { apiUrl:'http://qzos.invalid/api',requestTimeoutMs:1000 }
+    const baseConfig = { apiUrl:'http://qzos.invalid/api',requestTimeoutMs:1000 }
+    const config = { ...baseConfig, ...(ownerUserId === undefined ? {} : { ownerUserId }) }
     let plugin = ctx.plugin(Employees,config); await plugin.await()
     const call = async (body: object) => nativeFetch(`${ctx.webServer.getOrigin()}/qzos/employees`,{ method:'POST',headers:{ 'Content-Type':'application/json' },body:JSON.stringify(body) })
     rejected=true; expect((await call({ action:'logout' })).status).toBe(403); rejected=false
@@ -67,9 +68,37 @@ it('persists bindings across reload, rechecks each turn, and refuses another acc
     await expect(step()).rejects.toThrow('重新登录')
     await call({ action:'authorize',token:'synthetic' })
     expect(JSON.stringify(await step())).toContain('evidence-4')
-    owner='2'; await call({ action:'authorize',token:'other' })
-    await expect(step()).rejects.toThrow('所属')
-    expect((await call({ action:'bind',token:'other',sessionId:agent.session.id,employeeId:'7' })).status).toBe(400)
+    owner='2'
+    const switched = await call({ action:'authorize',token:'other' })
+    expect(switched.status).toBe(ownerUserId ? 403 : 200)
+    if (ownerUserId) {
+      expect(await switched.json()).toMatchObject({ code:'QZOS_HOST_ACCOUNT_MISMATCH' })
+      owner='1'
+      expect(JSON.stringify(await step())).toContain('evidence-5')
+      owner='2'
+    } else await expect(step()).rejects.toThrow('所属')
+    expect((await call({ action:'bind',token:'other',sessionId:agent.session.id,employeeId:'7' })).status).toBe(ownerUserId ? 403 : 400)
     await call({ action:'logout' }); await expect(step()).rejects.toThrow('重新登录')
+    await plugin.dispose()
+    expect((await call({ action:'logout' })).status).toBe(404)
+    if (ownerUserId) {
+      for (const changed of [{ ...config, ownerUserId:'2' }, baseConfig, { ...config, apiUrl:'http://another.invalid/api' }]) {
+        const wrong = ctx.plugin(Employees,changed)
+        await expect(wrong.await()).rejects.toThrow('stored owner')
+        await wrong.dispose()
+      }
+    } else {
+      const wrong = ctx.plugin(Employees,{ ...baseConfig,ownerUserId:'2' })
+      await expect(wrong.await()).rejects.toThrow('another account')
+      await wrong.dispose()
+    }
+    for (const invalid of ['', '0', '01', 'abc']) {
+      const wrong = ctx.plugin(Employees,{ ...baseConfig,ownerUserId:invalid })
+      await expect(wrong.await()).rejects.toThrow('Invalid QZOS Host owner')
+      await wrong.dispose()
+    }
+    plugin=ctx.plugin(Employees,config); await plugin.await()
+    owner='1'
+    expect((await call({ action:'authorize',token:'synthetic' })).status).toBe(200)
   } finally { await ctx.fiber.dispose(); vi.unstubAllGlobals() }
 })

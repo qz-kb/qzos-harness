@@ -2607,8 +2607,11 @@ export type Config = LocalConfig
 - `source`: [`packages/host/qzos-employees/src/index.ts:21`](../packages/host/qzos-employees/src/index.ts)
 
 ```ts config-catalog
-/** Explicit local QZOS endpoint configuration. */
-export type Config = BusinessConfig
+/** Explicit QZOS endpoint and optional deployment-owned account assignment. */
+export interface Config extends BusinessConfig {
+  /** Backend user ID assigned to a dedicated Host; never supplied by the browser. */
+  ownerUserId?: string
+}
 
 /** Fixed backend origin and request deadline supplied by the plugin configuration. */
 export interface BusinessConfig {
