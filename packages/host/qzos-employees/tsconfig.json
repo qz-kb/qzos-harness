@@ -31,6 +31,12 @@
     },
     {
       "path": "../webserver"
+    },
+    {
+      "path": "../../core/tools"
+    },
+    {
+      "path": "../../interaction/user-approval"
     }
   ]
 }

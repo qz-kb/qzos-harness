@@ -5,6 +5,7 @@ import type { PanelProps } from './Panel.tsx'
 import type { Example } from './catalog.ts'
 import { ResourceFields } from './ResourceForms.tsx'
 import { KnowledgeDetail } from './KnowledgeDetail.tsx'
+import { EmployeeSquare } from './EmployeeSquare.tsx'
 import { EmployeeDetail } from './EmployeeDetail.tsx'
 import { resourceDraft, type PreviewValues } from './resource-schema.ts'
 import { resourceCopy, type ResourceText } from './resource-copy.ts'
@@ -62,6 +63,7 @@ export function ResourcePanel(props: ResourcePanelProps) {
     })),
     documents_model_id: Array.isArray(models.chatModels) ? knowledgeRows(models.chatModels).flatMap(row => Array.isArray(row.models) ? knowledgeRows(row.models).map(child => ({ value: `${knowledgeText(row.id)}:${knowledgeText(child.id)}`, label: `${knowledgeText(row.name)} / ${knowledgeText(child.alias ?? child.name)}`, disabled: row.is_ready === false || child.is_ready === false })) : []) : [],
   }
+  const [square, setSquare] = useState(false)
   const [busy, setBusy] = useState(false)
   const pending = useRef(false)
   const [lifetime] = useState(() => new AbortController())
@@ -130,6 +132,8 @@ export function ResourcePanel(props: ResourcePanelProps) {
     })
   }
   return <section className={css.page} data-qzos-panel={panel}>
+    {square && <EmployeeSquare {...props} onClose={() => { setSquare(false) }} />}
+    {panel === 'employees' && <Button onClick={() => { setSquare(true) }}>{t('employeeSquare')}</Button>}
     {remote.status === 'loading' && <p role="status">{t(panel === 'employees' ? 'employeeLoading' : 'kbLoading')}</p>}
     {remote.status === 'failed' && <p role="alert">{remote.failure?.message}<Button onClick={() =>{  actions.refreshKnowledge() }}>{r('refresh')}</Button></p>}
     {!item ? <>

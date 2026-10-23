@@ -10683,6 +10683,12 @@ importers:
       '@deepseek-ai/dsh-storage-domain':
         specifier: workspace:*
         version: link:../../storage/storage-domain
+      '@deepseek-ai/dsh-tools':
+        specifier: workspace:*
+        version: link:../../core/tools
+      '@deepseek-ai/dsh-user-approval':
+        specifier: workspace:*
+        version: link:../../interaction/user-approval
       '@deepseek-ai/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery

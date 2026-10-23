@@ -89,9 +89,37 @@ export function installKnowledgeResources(ctx: Context): void {
             const [rows, models, knowledge] = await Promise.all([knowledgePages('/kb.robot/lists', signal), knowledgeRequest('/index/models', undefined, signal), knowledgePages('/kb.know/lists?type=0', signal)])
             value = { rows, models, knowledge }; break
           }
+          case 'employee-square': {
+            const [categories, page, used] = await Promise.all([
+              knowledgeRequest('/kb.square/category', undefined, signal),
+              knowledgeRequest(`/kb.square/lists?cid=${encodeURIComponent(url.searchParams.get('category') ?? '')}&keyword=${encodeURIComponent(url.searchParams.get('keyword') ?? '')}&page_no=${encodeURIComponent(url.searchParams.get('page') ?? '1')}&page_size=25`, undefined, signal),
+              knowledgeRequest('/kb.square/record', undefined, signal),
+            ])
+            value = { categories: knowledgeRows(categories), ...loginRecord(page), used: knowledgeRows(used) }; break
+          }
+          case 'employee-skills': {
+            const [rows, bindings] = await Promise.all([knowledgeRequest('/skill.skill/lists', undefined, signal), knowledgeRequest(`/skill.skill/bindings?robot_id=${id}`, undefined, signal)])
+            value = { rows: knowledgeRows(rows), bound: knowledgeRows(loginRecord(bindings).skills) }; break
+          }
+          case 'employee-plugins': {
+            const [rows, bound] = await Promise.all([knowledgeRequest('/plugin.connection/available', undefined, signal), knowledgeRequest(`/plugin.connection/bindings?robot_id=${id}`, undefined, signal)])
+            value = { rows: knowledgeRows(rows), bound: knowledgeRows(bound) }; break
+          }
+          case 'employee-session-records': value = { rows: knowledgeRows(await knowledgeRequest(`/kb.dsh/records?session_id=${encodeURIComponent(id)}`, undefined, signal)) }; break
+          case 'employee-share-categories': value = { rows: knowledgeRows(await knowledgeRequest('/kb.robot/categoryLists', undefined, signal)) }; break
           case 'employee': value = { detail: loginRecord(await knowledgeRequest(`/kb.robot/detail?id=${encodeURIComponent(id)}`, undefined, signal)) }; break
           case 'employee-keys': value = { rows: knowledgeRows(await knowledgeRequest(`/kb.publish/keyLists?publish_id=${encodeURIComponent(id)}`, undefined, signal)) }; break
-          case 'employee-stats': value = loginRecord(await knowledgeRequest(`/kb.chat/dataCount?robot_id=${encodeURIComponent(id)}`, undefined, signal)); break
+          case 'employee-stats': {
+            const [counts, usage] = await Promise.all([
+              knowledgeRequest(`/kb.chat/dataCount?robot_id=${encodeURIComponent(id)}`, undefined, signal),
+              knowledgeRequest(`/kb.dsh/summary?robot_id=${encodeURIComponent(id)}`, undefined, signal),
+            ])
+            value = { ...loginRecord(counts), dsh: loginRecord(usage) }; break
+          }
+          case 'employee-feedback': {
+            const to = Math.floor(Date.now() / 1000)
+            value = loginRecord(await knowledgeRequest(`/v1/kb/feedback/summary?robot_id=${encodeURIComponent(id)}&from=${to - 30 * 86400}&to=${to}`, undefined, signal)); break
+          }
           case 'employee-records': value = { rows: await knowledgePages(`/kb.chat/dataRecord?robot_id=${encodeURIComponent(id)}&is_feedback=-1`, signal) }; break
           case 'employee-publications': value = { rows: await knowledgePages(`/kb.share/lists?robot_id=${encodeURIComponent(id)}&type=${url.searchParams.get('type') === '4' ? 4 : 1}`, signal) }; break
           case 'acl': {
@@ -118,7 +146,14 @@ export function installKnowledgeResources(ctx: Context): void {
               ? loginRecord(await knowledgeRequest(`/kb.teach/parseReview?kb_id=${encodeURIComponent(id)}&fd_id=${encodeURIComponent(fd)}&job_key=${encodeURIComponent(knowledgeText(status.job_key))}`, undefined, signal)) : null
             value = { status, review }; break
           }
-          case 'fragments': value = { rows: await knowledgePages(`/kb.teach/datas?kb_id=${encodeURIComponent(id)}&fd_id=${encodeURIComponent(fd)}`, signal) }; break
+          case 'fragments': {
+            const rows = await knowledgePages(`/kb.teach/datas?kb_id=${encodeURIComponent(id)}&fd_id=${encodeURIComponent(fd)}`, signal)
+            const [learning, qa] = await Promise.all([
+              knowledgeRequest('/kb.teach/detection', { kb_id: Number(id), fd_id: Number(fd), uuids: rows.slice(0, 50).map(row => row.uuid) }, signal),
+              knowledgeRequest('/kb.teach/qaCheck', { fd_ids: [Number(fd)] }, signal),
+            ])
+            value = { rows, learning: loginRecord(learning), qa: loginRecord(qa) }; break
+          }
           case 'members': value = { rows: knowledgeRows(await knowledgeRequest(`/kb.know/teamLists?kb_id=${encodeURIComponent(id)}`, undefined, signal)) }; break
           default: throw new Error('Unknown QZOS resource')
         }

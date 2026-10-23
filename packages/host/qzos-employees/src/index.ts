@@ -8,7 +8,8 @@ import type {} from '@deepseek-ai/dsh-agent'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
-import { userId, employee, context, type BusinessConfig } from './business.ts'
+import { userId, employee, contextDetails, type BusinessConfig } from './business.ts'
+import { execution } from './execution.ts'
 
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
@@ -18,10 +19,17 @@ declare module '@deepseek-ai/dsh-llm' {
 }
 
 /** Explicit local QZOS endpoint configuration. */
-export type Config = BusinessConfig
+export type Config = BusinessConfig & {
+  /** Opt-in trusted receipts and employee capability tools; false keeps retrieval-only behavior. */
+  execution?: false | {
+    /** Environment-variable name holding the shared Host/server signing secret. */
+    secretEnv: string
+  }
+}
 /** Plugin configuration; the composition owns endpoint and timeout choices. */
 export const Config: schema<Config> = schema.object({
   apiUrl: schema.string().required(), requestTimeoutMs: schema.natural().min(1).required(),
+  execution: schema.union([schema.const(false), schema.object({ secretEnv: schema.string().required() })]).default(false),
 })
 /** Services used by this host-only plugin. */
 export const inject = ['webServer', 'connection', 'agents', 'storageDomain']
@@ -60,6 +68,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   }
   const lifetime = new AbortController()
   ctx.effect(() => () => { revoke(); lifetime.abort(); return domain.close() }, 'QZOS employee lifetime')
+  const adapter = config.execution ? await execution(ctx, config, process.env[config.execution.secretEnv] ?? '', () => active, id => bindings.get(id)) : undefined
   const connection = Reflect.get(ctx, 'connection') as Connection
   ctx.effect(() => ctx.webServer.register({ kind: 'exact', path: '/qzos/employees', handler: async (req, res) => {
     const rejection = connection.requestRejection(req)
@@ -79,7 +88,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
       const operation = mutation.then(async () => {
         if (input.action === 'logout') { revoke(); return }
         const owner = await userId(config, input.token, lifetime.signal)
-        if (input.action === 'authorize') { activate(owner, input.token); return }
+        if (input.action === 'authorize') { activate(owner, input.token); if (active) await adapter?.recover(active); return }
         const sessionId = input.sessionId as SessionId
         const agent = ctx.agents.get(sessionId)
         if (!agent) throw new Error('请先打开该员工会话')
@@ -90,6 +99,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
         if (!existing && (agent.status !== 'idle' || agent.session.requestHeader())) throw new Error('会话已经开始，请重新新建员工会话')
         if (!existing) await bindings.put(sessionId, { userId: owner, employeeId: input.employeeId, apiUrl: config.apiUrl })
         activate(owner, input.token)
+        adapter?.attach(agent)
       })
       if (input.action === 'bind') pending.set(input.sessionId, operation)
       mutation = operation.catch(() => { /* The individual request reports its failure; the queue remains usable. */ })
@@ -105,18 +115,20 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   // Native forks inherit the same immutable owner/employee binding, including nested forks.
   ctx.on('agent/created', async ({ agent }) => {
     const parent = agent.session.header.parentSession
-    if (!parent) return
+    if (!parent) { adapter?.attach(agent); return }
     await pending.get(parent)
     const inherited = bindings.get(parent)
     if (inherited && !bindings.get(agent.session.id)) await bindings.put(agent.session.id, inherited)
+    adapter?.attach(agent)
   })
-  ctx.on('agent/pre-step', async ({ agent, signal }, next) => {
+  ctx.on('agent/pre-step', async ({ agent, signal, turn }, next) => {
     await pending.get(agent.session.id)
     const binding = bindings.get(agent.session.id)
     if (!binding) {
       if (agent.session.header.parentSession && bindings.get(agent.session.header.parentSession)) throw new Error('员工会话分叉尚未支持，请从员工入口新建会话')
       return next()
     }
+    adapter?.attach(agent)
     const credential = active
     if (!credential || binding.apiUrl !== config.apiUrl || credential.userId !== binding.userId) throw new Error('请使用该员工会话所属的 QZOS 账号重新登录')
     const owner = await userId(config, credential.token, signal)
@@ -125,9 +137,13 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     if (decision.kind === 'reject') return decision
     const question = decision.messages.filter(message => message.source.kind === 'user')
       .flatMap(message => message.content.flatMap(part => part.type === 'text' ? [part.text] : [])).join('\n')
-    const text = question.trim() ? await context(config, credential.token, binding.employeeId, question, signal) : undefined
-    if (!text) await employee(config, credential.token, binding.employeeId, signal)
+    const details = question.trim() ? await contextDetails(config, credential.token, binding.employeeId, question, signal) : undefined
+    if (!details) await employee(config, credential.token, binding.employeeId, signal)
     if (active !== credential) throw new Error('QZOS 登录已变化，请重新发送')
+    await adapter?.prepare(agent.session.id, {
+      userId: binding.userId, employeeId: binding.employeeId, turn, question, sources: details?.sources ?? [],
+    })
+    const text = details?.text
     return text ? { ...decision, messages: [createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'qzos-employee-context', form: 'snapshot' } }), ...decision.messages] } : decision
   }, { prepend: true })
 }

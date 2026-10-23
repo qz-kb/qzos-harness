@@ -1674,6 +1674,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [
       'client-ui-agent-preset AgentPresetLabel id \'agent-preset\'',
       'client-ui-jobs JobListAction id \'job-list\'',
+      'client-ui-qzos EmployeeFeedbackButton id \'qzos-feedback\'',
       'client-ui-subagent SubagentCatalogAction id \'subagent-catalog\'',
       'experimental-client-ui-agent-team TeamAction id \'agent-team\'',
     ],
@@ -3390,6 +3391,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [
       'client-ui-chat QuotaNoticeHost id \'chat.quota-notice\'',
       'client-ui-plugin-manager PluginRefreshToast id \'plugin-manager.refresh-toast\'',
+      'client-ui-qzos EmployeeFeedback id \'qzos-feedback\'',
       'client-ui-qzos Login id \'qzos-login\'',
       'client-ui-schedule ScheduleDeleteToast id \'schedule.delete-toast\'',
       'client-ui-settings-account DesktopOnboardingEntry id \'desktop-onboarding\'',

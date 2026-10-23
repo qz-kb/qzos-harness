@@ -5,6 +5,9 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { installKnowledgeResources } from './knowledge-client.ts'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { EmployeeFeedback, EmployeeFeedbackButton } from './EmployeeFeedback.tsx'
 import { Login } from './Login.tsx'
 import { Brand, NativePanelIcon, PanelIcon, QzosPanel } from './Panel.tsx'
 import { createQzosStore } from './store.ts'
@@ -31,6 +34,10 @@ export function apply(ctx: Context): void {
   const store = createQzosStore()
   installKnowledgeResources(ctx)
   installEmployeeContextPresentation(ctx)
+  const feedback = createSnapshotStore<SessionId | null>(null)
+  const closeFeedback = () => { feedback.set(null) }
+  ctx.slots.inject('conversation.session.header.actions', () => ctx.slots.register({ name: 'conversation.session.header.actions', id: 'qzos-feedback', locale: 'qzos', inject: sessionId => ({ onOpen: () => { feedback.set(sessionId) } }) }, EmployeeFeedbackButton))
+  ctx.slots.inject('shell.overlay', () => ctx.slots.register({ name: 'shell.overlay', id: 'qzos-feedback', locale: 'qzos', store, inject: () => ({ hooks: { feedback }, onClose: closeFeedback }) }, EmployeeFeedback))
   const openEmployee = installEmployeeMentions(ctx, t)
   const developer = window.sessionStorage.getItem('qzos.preview') === '1'
   ctx.slots.inject('sidebar.brand.name', () => ctx.slots.register({ name: 'sidebar.brand.name', locale: 'qzos' }, Brand))

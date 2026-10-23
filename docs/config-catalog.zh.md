@@ -2606,11 +2606,17 @@ export type Config = LocalConfig
 ## `@deepseek-ai/dsh-qzos-employees`
 
 - `inject`: `webServer` · `connection` · `agents` · `storageDomain`
-- `source`: [`packages/host/qzos-employees/src/index.ts:21`](../packages/host/qzos-employees/src/index.ts)
+- `source`: [`packages/host/qzos-employees/src/index.ts:22`](../packages/host/qzos-employees/src/index.ts)
 
 ```ts config-catalog
 /** Explicit local QZOS endpoint configuration. */
-export type Config = BusinessConfig
+export type Config = BusinessConfig & {
+  /** Opt-in trusted receipts and employee capability tools; false keeps retrieval-only behavior. */
+  execution?: false | {
+    /** Environment-variable name holding the shared Host/server signing secret. */
+    secretEnv: string
+  }
+}
 
 /** Fixed backend origin and request deadline supplied by the plugin configuration. */
 export interface BusinessConfig {

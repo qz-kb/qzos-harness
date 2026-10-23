@@ -1,10 +1,13 @@
 /** Original QZOS employee settings, publishing and conversation-data page organization. */
 import { useEffect, useRef, useState } from 'react'
+import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { Button, Input, Modal, IconChevronLeftOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PanelProps } from './Panel.tsx'
 import { catalogs, type Example } from './catalog.ts'
 import type { PreviewRow } from './resource-fixtures.ts'
 import { resourceDraft, type PreviewValues, type ResourceForm } from './resource-schema.ts'
+import { EmployeeBindings } from './EmployeeBindings.tsx'
+import { EmployeeSquare } from './EmployeeSquare.tsx'
 import { ResourceFields } from './ResourceForms.tsx'
 import { ResourceTable } from './ResourceTable.tsx'
 import { resourceCopy, type ResourceText } from './resource-copy.ts'
@@ -71,6 +74,7 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
   const query = `id=${item.id}&epoch=${epoch}&revision=${revision}`
   const publicationResource = useResource<'qzos-knowledge'>(section === 'release' && channel ? `dsh-resource://qzos-knowledge/employee-publications?${query}&type=${channel === 'api' ? 4 : 1}` : '')
   const recordResource = useResource<'qzos-knowledge'>(section === 'dialogue' ? `dsh-resource://qzos-knowledge/employee-records?${query}` : '')
+  const feedbackResource = useResource<'qzos-knowledge'>(section === 'dialogue' ? `dsh-resource://qzos-knowledge/employee-feedback?${query}` : '')
   const statsResource = useResource<'qzos-knowledge'>(section === 'dialogue' ? `dsh-resource://qzos-knowledge/employee-stats?${query}` : '')
   const keysResource = useResource<'qzos-knowledge'>(dialog?.kind === 'keys' && dialog.row ? `dsh-resource://qzos-knowledge/employee-keys?id=${dialog.row.id}&epoch=${epoch}&revision=${revision}` : '')
   const keys = keysResource.value ? knowledgeRows(keysResource.value.rows) : []
@@ -92,7 +96,7 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
   const update = (key: string, value: string) =>{  setDraft(current => ({ ...current, [key]: value })) }
   const show = (kind: EmployeeDialog['kind'], row?: PreviewRow, readOnly = false) => {
     setIssuedKey(''); setSelectedKey(''); setCalls(null)
-    setDialogDraft(resourceDraft(row ? { ...row, password: '', quotaDaily: row.limit_today_chat ?? '0', quotaTotal: row.limit_total_chat ?? '0' } : {}))
+    setDialogDraft(resourceDraft(row ? { ...row, feedback_type: 'correction', feedback_key: randomUUID(), password: '', quotaDaily: row.limit_today_chat ?? '0', quotaTotal: row.limit_total_chat ?? '0' } : {}))
     setDialog({ kind, readOnly, ...row ? { row } : {} })
   }
   const saveDialog = () => { void perform(async () => {
@@ -108,7 +112,7 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
     } else if (dialog.kind === 'quota' && dialog.row) {
       await request('/kb.share/edit', { id: Number(dialog.row.id), limit_today_chat: Number(dialogDraft.quotaDaily), limit_total_chat: Number(dialogDraft.quotaTotal) })
     } else if (dialog.kind === 'feedback' && dialog.row) {
-      await request('/kb.chat/feedback', { robot_id: Number(item.id), record_id: Number(dialog.row.id), content: dialogDraft.feedback })
+      await request('/v1/kb/feedback', { robot_id: Number(item.id), record_id: Number(dialog.row.id), type: dialogDraft.feedback_type, idempotency_key: dialogDraft.feedback_key, content: dialogDraft.feedback_type === 'correction' ? dialogDraft.feedback : '' })
     } else if (dialog.kind === 'correct' && dialogDraft.kb_id) {
       await request('/kb.chat/chatCorrect', { kb_id: Number(dialogDraft.kb_id), ask: dialogDraft.question, reply: dialogDraft.answer, images: [], files: [], video: [] })
     } else { unsupported(); return }
@@ -127,13 +131,17 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
     : dialog?.kind === 'api' ? 'createApi' : dialog?.kind === 'quota' ? 'usageSettings' : dialog?.kind === 'keys' ? 'manageKeys'
       : dialog?.kind === 'feedback' ? 'questionFeedback' : dialog?.kind === 'correct' ? 'correct' : 'viewReply'
   const form: ResourceForm = dialog?.kind === 'menu' ? 'menu' : dialog?.kind === 'correct' ? 'fragment' : 'share'
-  const tabList: readonly [ResourceForm | 'bindings', ResourceText][] = [['employeeBase', 'base'], ['bindings', 'skillBindings'], ['employeeSearch', 'modelSearch'], ['employeeInterface', 'interface'], ['employeeFlow', 'flow']]
+  const [sharing, setSharing] = useState(false)
+  const tabList: readonly [ResourceForm | 'bindings', ResourceText][] = [['employeeBase', 'base'], ['bindings', 'skillBindings'], ['employeeSearch', 'modelSearch'], ['employeeInterface', 'interface']]
   const platformGroups: readonly [ResourceText, readonly ResourceText[]][] = [['webapp', ['web', 'js', 'oa', 'poster']], ['apiAccess', ['api', 'qwx', 'rpa']]]
   return <div className={css.employeeDetail} aria-busy={busy}>
-    {[publicationResource, recordResource, statsResource, keysResource].map((remote, index) => remote.status === 'failed' ? <p key={index} role="alert">{remote.failure?.message}</p> : null)}
+    {sharing && <EmployeeSquare {...props} employeeId={item.id} onClose={() => { setSharing(false); onSaved() }} />}
+    <Button onClick={() => { setSharing(true) }}>{t('employeeShare')}</Button>
+    {[publicationResource, recordResource, statsResource, keysResource, feedbackResource].map((remote, index) => remote.status === 'failed' ? <p key={index} role="alert">{remote.failure?.message}</p> : null)}
     {notice && <p className={css.notice} role="status">{notice}</p>}
     {section === 'edit' && <>
       <p className={css.notice}>{t('employeeWindowModel')}</p>
+      {Number(original.flow_status) === 1 && <div className={css.inner}><p>{t('legacyFlowHint')}</p><Button disabled={busy} onClick={() => { update('flow_status', '0') }}>{t('legacyFlowDisable')}</Button>{draft.flow_status === '0' && <p>{t('legacyFlowSave')}</p>}</div>}
       <div className={css.tabs}>
         {tabList.map(([tab, label]) =>
           <Button key={tab} aria-pressed={editTab === tab} onClick={() =>{  setEditTab(tab) }}>{r(label)}</Button>)}
@@ -150,7 +158,7 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
         {knowledgeAction === 'replace' && <p>{t('employeeKnowledgeSelect')}</p>}
         {knowledgeAction === 'remove' && <p>{t('employeeKnowledgeRemoveHint')}</p>}
       </div>}
-      {editTab === 'bindings' ? <div className={css.inner}><div className={css.toolbar}><Button disabled>{r('bindSkill')}</Button><Button disabled>{r('bindPlugin')}</Button></div><p>{t('employeeBindingsUnavailable')}</p><ResourceTable r={r} rows={bindings} columns={[['name', 'bindingName'], ['kind', 'bindingStatus']]} /></div>
+      {editTab === 'bindings' ? <EmployeeBindings {...props} employeeId={item.id} />
         : <>{editTab === 'employeeFlow' && <p className={css.notice}>{t('employeeFlowUnavailable')}</p>}
           <ResourceFields t={t} form={editTab} draft={draft} knowledge={knowledge} options={modelOptions}
             onChange={update} editing disabled={busy} disabledFields={original.can_manage_knowledge_dependency === false || (rebindRequired && knowledgeAction !== 'replace') ? ['kb_ids'] : []} />
@@ -178,7 +186,10 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
     </div>}
     {section === 'dialogue' && <div className={css.inner}>
       <div className={css.tabs}><Button aria-pressed={dialogueTab === 'data'} onClick={() =>{  setDialogueTab('data') }}>{r('dialogue')}</Button><Button aria-pressed={dialogueTab === 'records'} onClick={() =>{  setDialogueTab('records') }}>{r('dialogueRecords')}</Button></div>
-      {dialogueTab === 'data' ? <div className={css.stats}>{(['totalConversations', 'todayConversations', 'totalUsers', 'totalTokens'] as const).map((label, index) => { const stats = statsResource.value; const robot = stats ? loginRecord(stats.robot) : {}; const visitor = stats ? loginRecord(stats.visitor) : {}; const value = [robot.wholeChatCount, robot.todayChatCount, visitor.wholeVisitorCount, undefined][index]; return <div key={label}>{r(label)}<strong>{value === undefined ? '—' : knowledgeText(value)}</strong></div> })}</div>
+      <p>{t('feedbackScope')}</p><p>{t('dshUsageScope')}</p>
+      {statsResource.value && Number(loginRecord(statsResource.value.dsh).pending_calls) > 0 && <p>{t('usagePending')}</p>}
+      {feedbackResource.value && <div className={css.stats}>{(['like', 'dislike', 'correction', 'miss'] as const).map(type => <div key={type}>{t(({ like: 'feedbackLike', dislike: 'feedbackDislike', correction: 'feedbackCorrection', miss: 'feedbackMiss' } as const)[type])}<strong>{knowledgeText(feedbackResource.value?.[type])}</strong></div>)}</div>}
+      {dialogueTab === 'data' ? <div className={css.stats}>{(['totalConversations', 'todayConversations', 'totalUsers', 'totalTokens'] as const).map((label, index) => { const stats = statsResource.value; const robot = stats ? loginRecord(stats.robot) : {}; const visitor = stats ? loginRecord(stats.visitor) : {}; const value = [robot.wholeChatCount, robot.todayChatCount, visitor.wholeVisitorCount, stats ? loginRecord(stats.dsh).total_tokens : undefined][index]; return <div key={label}>{r(label)}<strong>{value === undefined ? '—' : knowledgeText(value)}</strong></div> })}</div>
         : <><div className={css.toolbar}><Button disabled={selected.length === 0} onClick={() =>{  setConfirmation({ key: dialoguesKey, ids: selected }) }}>{r('batchDelete')}</Button><select aria-label={r('feedback')} value={feedbackFilter} onChange={(event) =>{  setFeedbackFilter(event.target.value) }}>{(['all', 'unreviewed', 'reviewed'] as const).map(value => <option key={value} value={value}>{r(value)}</option>)}</select></div>
           <ResourceTable rows={dialogueRows} r={r} selection={selected} onSelection={setSelected} columns={[['id', 'id'], ['userInfo', 'userInfo'], ['question', 'question'], ['answer', 'answer'], ['feedback', 'feedback'], ['questionTime', 'questionTime']]} actions={row => [{ label: 'questionFeedback', run: () =>{  show('feedback', row) } }, { label: 'correct', run: () =>{  show('correct', row) } }, { label: 'viewReply', run: () =>{  show('reply', row, true) } }, { label: 'delete', run: () =>{  setConfirmation({ key: dialoguesKey, ids: [row.id] }) } }]} />
         </>}
@@ -200,7 +211,7 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
           {calls && <div>{calls.length === 0 ? r('empty') : calls.map((row, index) => <p key={index}>{knowledgeText(row.request_id)} · {knowledgeText(row.state)} · {knowledgeText(row.error_code)}</p>)}</div>}
         </>
           : dialog?.kind === 'quota' ? <div className={css.formFields}>{(['quotaDaily', 'quotaTotal'] as const).map(key => <label key={key}>{r(key)}<Input type="number" min={0} value={dialogDraft[key] ?? '0'} onChange={(event) =>{  setDialogDraft(current => ({ ...current, [key]: event.target.value })) }} /></label>)}<label>{r('expiresAt')}<Input disabled type="date" value={dialogDraft.expiresAt ?? ''} onChange={(event) =>{  setDialogDraft(current => ({ ...current, expiresAt: event.target.value })) }} /></label></div>
-            : dialog?.kind === 'feedback' ? <label>{r('feedbackContent')}<textarea className={css.textArea} rows={5} value={dialogDraft.feedback ?? ''} onChange={(event) =>{  setDialogDraft(current => ({ ...current, feedback: event.target.value })) }} /></label>
+            : dialog?.kind === 'feedback' ? <><select aria-label={r('feedback')} value={dialogDraft.feedback_type} onChange={(event) => { setDialogDraft(current => ({ ...current, feedback_type: event.target.value, feedback_key: randomUUID() })) }}>{(['like', 'dislike', 'correction', 'miss'] as const).map(type => <option key={type} value={type}>{t(({ like: 'feedbackLike', dislike: 'feedbackDislike', correction: 'feedbackCorrection', miss: 'feedbackMiss' } as const)[type])}</option>)}</select>{dialogDraft.feedback_type === 'correction' && <label>{r('feedbackContent')}<textarea className={css.textArea} rows={5} value={dialogDraft.feedback ?? ''} onChange={(event) =>{  setDialogDraft(current => ({ ...current, feedback: event.target.value })) }} /></label>}</>
               : dialog?.kind === 'reply' ? <><strong>{dialog.row?.question}</strong><p>{dialog.row?.answer}</p></>
                 : dialog?.kind === 'api' ? <label>{r('name')}<Input value={dialogDraft.name ?? ''} onChange={(event) =>{  setDialogDraft(current => ({ ...current, name: event.target.value })) }} /></label>
                   : <>{dialog?.kind === 'correct' && <select aria-label={r('knowledge')} value={dialogDraft.kb_id ?? ''} onChange={(event) => { setDialogDraft(current => ({ ...current, kb_id: event.target.value })) }}><option value="">—</option>{knowledge.map(kb => <option key={kb.id} value={kb.id}>{kb.title}</option>)}</select>}<ResourceFields t={t} form={form} draft={dialogDraft} knowledge={knowledge} disabled={dialog?.readOnly ?? false}

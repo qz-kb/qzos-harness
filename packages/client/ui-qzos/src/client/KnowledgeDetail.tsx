@@ -50,6 +50,9 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
   const [importType, setImportType] = useState('docImport')
   const [files, setFiles] = useState<File[]>([])
   const imports = useRef(new Map<File, Record<string, unknown>>())
+  const originals = useRef(new Map<File, unknown>())
+  const [previews, setPreviews] = useState<Record<string, unknown>[]>([])
+  const [segmentLength, setSegmentLength] = useState(1000)
   const [accessFile, setAccessFile] = useState<PreviewRow | null>(null)
   const [parseFile, setParseFile] = useState<PreviewRow | null>(null)
   const [versionTarget, setVersionTarget] = useState<PreviewRow | null>(null)
@@ -76,6 +79,7 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
   const [dialogDraft, setDialogDraft] = useState<PreviewValues>({})
   const [confirmation, setConfirmation] = useState<{ key: string; ids: string[] } | null>(null)
   const [notice, setNotice] = useState('')
+  const [estimate, setEstimate] = useState('')
   const documentsKey = `${item.id}:documents`
   const fragmentsKey = `${item.id}:fragments:${document?.id ?? ''}`
   const membersKey = `${item.id}:members`
@@ -91,6 +95,7 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
 
   const update = (key: string, value: string) =>{  setDraft(current => ({ ...current, [key]: value })) }
   const show = (kind: Dialog['kind'], row?: PreviewRow) => {
+    setEstimate('')
     setDialogDraft(resourceDraft(kind === 'parameters' ? draft : row ? { ...row } : {}))
     setDialog({ kind, ...row ? { row } : {} })
   }
@@ -138,6 +143,26 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
     else for (const id of confirmation.ids) await knowledgeRequest(confirmation.key === membersKey ? '/kb.know/teamDel' : '/kb.know/fileRemove', confirmation.key === membersKey ? { id: Number(id) } : { fd_id: Number(id) })
     setConfirmation(null); setSelection([]); refresh()
   }) }
+  const previewImport = () => { void perform(async () => {
+    const method = importType === 'qaSplit' ? 2 : 3
+    const capabilities = loginRecord(await knowledgeRequest('/kb.teach/importCapabilities'))
+    if (loginRecord(loginRecord(capabilities.methods)[knowledgeText(method)]).supports_server_preview !== true) throw new Error(t('kbParserRequired'))
+    imports.current.clear(); setPreviews([])
+    const prepared: Record<string, unknown>[] = []
+    for (const file of files) {
+      let objectId = originals.current.get(file)
+      if (!objectId) {
+        const form = new FormData(); form.append('file', file); form.append('kb_id', item.id); form.append('purpose', 'pending_original')
+        objectId = loginRecord(await knowledgeRequest('/kb.file_gateway/upload', form)).object_id
+        originals.current.set(file, objectId)
+      }
+      const preview = loginRecord(await knowledgeRequest('/kb.teach/importPreview', { kb_id: Number(item.id), method, object_id: objectId, segment_length: segmentLength }))
+      const rows = knowledgeRows(preview.rows)
+      imports.current.set(file, { kb_id: Number(item.id), method, documents: [{ name: file.name, path: '', object_id: objectId, data: rows.map(row => ({ q: row.q, a: row.a })) }] })
+      prepared.push(...rows)
+    }
+    setPreviews(prepared)
+  }) }
   const importData = () => { void perform(async () => {
     const method = importType === 'qaSplit' ? 2 : importType === 'qaImport' ? 3 : importType === 'webImport' ? 4 : 1
     if (versionTarget && method !== 1) throw new Error(t('parseOneVersion'))
@@ -146,10 +171,11 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
     if (method === 4) {
       await knowledgeRequest('/kb.teach/import', { kb_id: Number(item.id), method, documents: [{ name: urls, path: '', data: [{ q: content, a: '' }] }] })
     } else {
-      if (capability.mode !== 'server') throw new Error(t('kbParserRequired'))
+      if (method === 1 ? capability.mode !== 'server' : capability.supports_server_preview !== true) throw new Error(t('kbParserRequired'))
       if (!files.length || (versionTarget && files.length !== 1)) throw new Error(t('parseOneVersion'))
       for (const file of files) {
         let submission = imports.current.get(file)
+        if (!submission && method !== 1) throw new Error(t('importPreviewRequired'))
         if (!submission) {
           const form = new FormData(); form.append('file', file); form.append('kb_id', item.id); form.append('purpose', 'pending_original')
           const uploaded = loginRecord(await knowledgeRequest('/kb.file_gateway/upload', form))
@@ -169,7 +195,7 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
   }) }
   const exportRows = () => {
     const csvCell = (value: string) => `"${value.replaceAll('"', '""')}"`
-    const data = [[r('documentContent'), r('extraContent')], ...(importType === 'qaImport' && mode === 'import' ? [] : fragments).map(row => [row.question ?? '', row.answer ?? ''])]
+    const data = [importType === 'qaImport' && mode === 'import' ? ['q', 'a'] : [r('documentContent'), r('extraContent')], ...(importType === 'qaImport' && mode === 'import' ? [] : fragments).map(row => [row.question ?? '', row.answer ?? ''])]
     const blob = new Blob(['\ufeff' + data.map(row => row.map(csvCell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const anchor = globalThis.document.createElement('a'); anchor.href = url; anchor.download = 'qzos-knowledge.csv'; anchor.click()
@@ -204,12 +230,18 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
       </> : mode === 'import' ? <>
         <Button disabled={busy} onClick={() =>{  setMode('documents') }}><IconChevronLeftOutlineRegular size={16} />{r('fileImport')}</Button>
         {versionTarget && <p>{r('uploadVersion')}: {versionTarget.name} · {versionTarget.version}</p>}
-        <div className={css.importTabs}>{(['docImport', 'qaImport', 'qaSplit', 'webImport'] as const).map(type => <button type="button" key={type} disabled={busy || Boolean(versionTarget && type !== 'docImport')} aria-pressed={importType === type} onClick={() => { setImportType(type); setFiles([]) }}>{r(type)}<small>{r(`${type}Desc`)}</small></button>)}</div>
+        <div className={css.importTabs}>{(['docImport', 'qaImport', 'qaSplit', 'webImport'] as const).map(type => <button type="button" key={type} disabled={busy || Boolean(versionTarget && type !== 'docImport')} aria-pressed={importType === type} onClick={() => { setImportType(type); setFiles([]); setPreviews([]); imports.current.clear(); originals.current.clear() }}>{r(type)}<small>{r(`${type}Desc`)}</small></button>)}</div>
         {importType === 'webImport' ? <><textarea className={css.textArea} rows={5} aria-label={r('webUrls')} placeholder={r('webUrls')} value={urls} onChange={(event) =>{  setUrls(event.target.value) }} /><Button onClick={() => { void perform(async () => { const captured = knowledgeRows(await knowledgeRequest('/kb.teach/capture', { url: urls.split('\n').filter(Boolean) })); setContent(captured.map(row => knowledgeText(row.content)).join('\n\n')) }) }}>{r('parse')}</Button><textarea className={css.textArea} rows={8} aria-label={r('fileContent')} placeholder={r('fileContent')} value={content} onChange={(event) =>{  setContent(event.target.value) }} /></>
-          : <><div className={css.dropZone}><span>{r('dropFile')}</span><Button>{r('chooseFile')}</Button><input type="file" multiple={!versionTarget} disabled={busy} aria-label={r('chooseFile')} accept={importType === 'qaImport' ? '.csv,.xlsx' : '.pdf,.doc,.docx,.txt,.md,.xlsx,.pptx'} onChange={(event) =>{  imports.current.clear(); setFiles(Array.from(event.target.files ?? [])) }} /></div>{files.map(file => <div className={css.result} key={`${file.name}:${file.lastModified}`}>{file.name}</div>)}{importType === 'qaImport' ? <Button onClick={exportRows}>{r('downloadTemplate')}</Button> : <div className={css.inline}><label>{r('segmentLength')} <input type="number" defaultValue={1000} min={100} max={10000} /></label><Button onClick={() => { setNotice(t('kbParserRequired')) }}>{r('repreview')}</Button></div>}{content && <p className={css.result}>{content}</p>}</>}
-        <div className={css.formFooter}><Button variant="primary" disabled={busy || !editable || (importType === 'webImport' ? !content : files.length === 0)} onClick={importData}>{r('save')}</Button></div>
+          : <><div className={css.dropZone}><span>{r('dropFile')}</span><Button>{r('chooseFile')}</Button><input type="file" multiple={!versionTarget} disabled={busy} aria-label={r('chooseFile')} accept={importType === 'qaImport' ? '.csv,.xlsx' : importType === 'qaSplit' ? '.pdf,.docx,.txt,.md' : '.pdf,.docx,.txt,.md,.xlsx,.pptx'} onChange={(event) =>{  imports.current.clear(); originals.current.clear(); setPreviews([]); setFiles(Array.from(event.target.files ?? [])) }} /></div>{files.map(file => <div className={css.result} key={`${file.name}:${file.lastModified}`}>{file.name}</div>)}{importType === 'qaImport' && <Button onClick={exportRows}>{r('downloadTemplate')}</Button>}{importType !== 'docImport' && <div className={css.inline}>{importType === 'qaSplit' && <label>{r('segmentLength')} <input type="number" value={segmentLength} min={100} max={10000} onChange={(event) => { setSegmentLength(Number(event.target.value)); imports.current.clear(); setPreviews([]) }} /></label>}<Button disabled={busy || files.length === 0} onClick={previewImport}>{r('repreview')}</Button></div>}{previews.length > 0 && <label>{t('importPreviewHint')}<textarea className={css.textArea} rows={12} readOnly value={previews.map(row => `${knowledgeText(row.q)}\n${knowledgeText(row.a)}`).join('\n\n')} /></label>}{content && <p className={css.result}>{content}</p>}</>}
+        <div className={css.formFooter}><Button variant="primary" disabled={busy || !editable || (importType === 'webImport' ? !content : files.length === 0 || (importType !== 'docImport' && previews.length === 0))} onClick={importData}>{r('save')}</Button></div>
       </> : <>
         <Button onClick={() => { setMode('documents'); setSearch(''); setQuery('') }}><IconChevronLeftOutlineRegular size={16} />{document?.name}</Button>
+        <Button disabled={busy} onClick={refresh}>{t('parseRefresh')}</Button>
+        {fragmentsResource.value && loginRecord(fragmentsResource.value.learning).pending === true && <p role="status">{t('learningPending')}</p>}
+        {fragmentsResource.value && knowledgeRows(loginRecord(fragmentsResource.value.qa).lists).map(qa => <p key={knowledgeText(qa.id)} role="status">
+          {knowledgeText(qa.status_msg)} {knowledgeText(qa.error)}
+          {Number(qa.status) === 3 && <Button disabled={busy || !editable} onClick={() => { void perform(async () => { await knowledgeRequest('/kb.teach/qaRetry', { kb_id: Number(item.id), fd_id: Number(document?.id) }); refresh() }) }}>{r('retry')}</Button>}
+        </p>)}
         <div className={css.toolbar}><div className={css.inline}><Button variant="primary" disabled={busy || !editable} onClick={() =>{  show('fragment') }}>{r('entryData')}</Button><Button disabled={busy || !editable} onClick={exportRows}>{r('exportAll')}</Button><Button disabled={busy || !editable || selection.length === 0} onClick={() =>{  retry(selection) }}>{r('batchRetry')}</Button><Button disabled={busy || !editable || selection.length === 0} onClick={() =>{  setConfirmation({ key: fragmentsKey, ids: selection }) }}>{r('batchDelete')}</Button></div>
           <div className={css.inline}><Input value={query} aria-label={r('keyword')} placeholder={r('keyword')} onChange={(event) => { setQuery(event.target.value); setSearch(event.target.value) }} /><select value={status} onChange={(event) =>{  setStatus(event.target.value) }} aria-label={r('learningStatus')}>{(['all', 'waitingLearn', 'learning', 'failedLearn', 'learned'] as const).map(value => <option key={value} value={value}>{r(value)}</option>)}</select></div></div>
         <ResourceTable rows={filteredFragments} r={r} selection={selection} onSelection={setSelection} columns={[['question', 'documentContent'], ['answer', 'extraContent'], ['status', 'learningStatus'], ['consumed', 'consumed'], ['updatedAt', 'updatedAt']]} cell={(row, key) => key === 'status' ? r(row.status === 'learned' ? 'learned' : row.status === 'failedLearn' ? 'failedLearn' : row.status === 'learning' ? 'learning' : 'waitingLearn') : row[key] ?? '—'} actions={row => [
@@ -228,6 +260,7 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
     <Modal open={dialog !== null && dialog.kind !== 'acl'} onClose={() =>{  setDialog(null) }} closeLabel={r('close')} title={r(dialogTitle)} className={css.dialog as string}
       footer={<><Button variant="outline" onClick={() =>{  setDialog(null) }}>{r('cancel')}</Button><Button variant="primary" disabled={busy || dialog?.kind === 'acl'} onClick={saveDialog}>{r('confirm')}</Button></>}>
       {notice && <p role="alert">{notice}</p>}
+      {dialog?.kind === 'fragment' && <><Button disabled={busy || !dialogDraft.question?.trim()} onClick={() => { void perform(async () => { const value = loginRecord(await knowledgeRequest('/kb.teach/charging', { kb_id: Number(item.id), text: `${dialogDraft.question ?? ''}\n${dialogDraft.answer ?? ''}` })); setEstimate(knowledgeText(value.tokens)) }) }}>{t('learningEstimate')}</Button>{estimate && <p role="status">{t('learningEstimateHint')}: {estimate}</p>}</>}
       {dialog?.kind === 'rename' ? <label>{r('name')}<Input value={dialogDraft.name ?? ''} onChange={(event) =>{  setDialogDraft(current => ({ ...current, name: event.target.value })) }} /></label>
         : dialog?.kind === 'transfer' ? <><p>{r('transferConfirm')}</p><select aria-label={r('memberInfo')} value={dialogDraft.member ?? ''} onChange={(event) =>{  setDialogDraft(current => ({ ...current, member: event.target.value })) }}><option value="">—</option>{members.filter(member => member.role !== 'owner').map(member => <option key={member.id} value={member.id}>{member.nickname}</option>)}</select></>
           : <ResourceFields t={t} form={dialogForm} draft={dialogDraft} knowledge={knowledge} options={dialog?.kind === 'parameters' ? { ...modelOptions, optimize_m_id: modelOptions.documents_model_id ?? [] } : {}}

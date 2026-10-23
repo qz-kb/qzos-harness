@@ -9,14 +9,17 @@
   en: e94b6418d759bfc9
   zh: 99cd9dcf35405e7a
 /qzos-employee-host-adapter/summary:
-  en: 9ca30323904c0439
-  zh: 737d8b04a9a9ac1f
+  en: c4bf8b15df6aacad
+  zh: de5e883c7ca5b9fe
 /qzos-employee-host-adapter/table-of-contents:
-  en: 2b3672f743064614
-  zh: 75282f91d6c24b3d
+  en: 85088fb0789b65e3
+  zh: d1b42f20f374a40d
 /qzos-employee-host-adapter/contract:
   en: d892658ceda5e392
-  zh: 895adf96d2b560e9
+  zh: aab69f16a4faaec2
+/qzos-employee-host-adapter/optional-execution-adapter:
+  en: 07b93accff0630b3
+  zh: 1b2cdaffe3f82945
 /qzos-employee-host-adapter/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -33,8 +36,8 @@
   en: 30be7ac0c3c4108f
   zh: 4af48ce2b5b18293
 /qzos-employee-host-adapter/known-limitations-and-deferred-work:
-  en: c2e723bc7c2b85cf
-  zh: e63656c6ec7f6935
+  en: 1a3078d9e7b7595e
+  zh: 54c500df26d814e9
 /qzos-employee-host-adapter/known-limitations-and-deferred-work/dev-note:
   en: de1659d019e8b5f6
   zh: 478aa4bbed0c004e
