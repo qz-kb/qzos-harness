@@ -1,10 +1,11 @@
 /** Candidate reads and revision-bound writes for the QZOS document service. */
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { loginRecord, type LoginRecord } from './login-client.ts'
+import { sourceLocation, type SourceLabels } from './knowledge-source.ts'
 import { knowledgeRows, knowledgeText } from './knowledge-client.ts'
 
 /** Candidate actions advertised by the server. */
-export type ParseAction = 'review' | 'retry' | 'cancel' | 'continue' | 'replace'
+export type ParseAction = 'review' | 'retry' | 'cancel' | 'continue' | 'replace' | 'correct'
 /** Account-bound transport used for candidate writes and readback. */
 export type ParseCall = (path: string, body?: LoginRecord | FormData) => Promise<unknown>
 /** Immutable payload retained across an unknown delivery outcome. */
@@ -23,10 +24,11 @@ export function parseOperation(status: LoginRecord, action: ParseAction, extra: 
   if (processing) {
     if (!Array.isArray(processing.actions) || !processing.actions.includes(action) || !Number.isInteger(processing.revision)) throw new Error('候选状态已改变，请刷新后重试')
   } else if (action !== 'retry' || status.can_retry !== true) throw new Error('当前资料不允许此操作')
-  const endpoint = { review: 'parseReview', retry: 'parseRetry', cancel: 'parseCancel', continue: 'parseContinue', replace: 'parseReplace' }[action]
+  const endpoint = { review: 'parseReview', retry: 'parseRetry', cancel: 'parseCancel', continue: 'parseContinue', replace: 'parseReplace', correct: 'parseCorrect' }[action]
+  if (action === 'correct' && (!Number.isInteger(status.current_version) || Number(status.current_version) < 1)) throw new Error('当前有效版本不可纠错')
   return { path: `/kb.teach/${endpoint}`, body: {
     ...extra, kb_id: Number(status.kb_id), fd_id: Number(status.fd_id),
-    ...processing ? { job_key: knowledgeText(status.job_key), expected_revision: processing.revision, request_id: randomUUID() } : {},
+    ...action === 'correct' ? { expected_version: status.current_version, request_id: randomUUID() } : processing ? { job_key: knowledgeText(status.job_key), expected_revision: processing.revision, request_id: randomUUID() } : {},
   } }
 }
 
@@ -42,18 +44,18 @@ export async function submitParse(call: ParseCall, operation: ParseOperation): P
 
 /** Project editable facts without allowing source locations or table topology to change.
  * @param result - Server review result.
+ * @param labels - Localized source coordinate names.
  * @returns Text, cell and chart fact controls with immutable identities.
  */
-export function reviewFields(result: LoginRecord): ReviewField[] {
+export function reviewFields(result: LoginRecord, labels: SourceLabels): ReviewField[] {
   return knowledgeRows(result.elements).flatMap<ReviewField>((element) => {
     const id = knowledgeText(element.id)
     const data = loginRecord(element.data)
     const refs = Array.isArray(element.source_refs) ? knowledgeRows(element.source_refs) : []
-    const label = refs.map(ref => [ref.sheet, ref.cell_range, ref.page, ref.slide]
-      .map(knowledgeText).filter(Boolean).join(' / ')).join(' · ') || knowledgeText(data.title) || knowledgeText(element.type)
+    const label = sourceLocation({ source_refs: refs }, labels)
     if (element.type === 'text' || element.type === 'image_text') return [{ key: id, label, identity: { element_id: id }, values: { text: knowledgeText(data.text) } }]
     if (element.type === 'table') return knowledgeRows(data.cells).map(cell => ({
-      key: `${id}:${knowledgeText(cell.row)}:${knowledgeText(cell.col)}`, label: `${label} [${knowledgeText(cell.row)}, ${knowledgeText(cell.col)}]`,
+      key: `${id}:${knowledgeText(cell.row)}:${knowledgeText(cell.col)}`, label: `${cell.source_refs ? sourceLocation(cell, labels) : label} [${knowledgeText(cell.row)}, ${knowledgeText(cell.col)}]`,
       identity: { element_id: id, row: Number(cell.row), col: Number(cell.col) },
       values: { value: knowledgeText(cell.value), display_text: knowledgeText(cell.display_text) },
     }))

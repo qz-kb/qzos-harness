@@ -1,5 +1,8 @@
 /** Localized controls for QZOS resource previews. */
 export const zh = {
+  parseCorrect: '纠错并创建新版',
+  parseCorrectHint: '从当前有效版创建纠错草稿。请修改并保存具体事实，再确认学习；旧版保留到新版学习完成。',
+  sourcePage: '页码', sourceSlide: '幻灯片', sourceSheet: '工作表', sourceCells: '单元格', sourceParagraph: '段落', sourceMissing: '未提供精确位置',
   parseOriginal: '候选原件',
   parseIssueResolved: '此问题已保存复核结果',
   parseTitle: '解析与学习状态',
@@ -478,6 +481,9 @@ export const zh = {
 } satisfies Record<string, string>
 export type QzosKey = keyof typeof zh
 export const en: Record<QzosKey, string> = {
+  parseCorrect: 'Correct as a new version',
+  parseCorrectHint: 'Create a correction draft from the active version. Edit and save facts, then confirm learning. The old version remains active until learning completes.',
+  sourcePage: 'Page', sourceSlide: 'Slide', sourceSheet: 'Sheet', sourceCells: 'Cells', sourceParagraph: 'Paragraph', sourceMissing: 'Exact location unavailable',
   parseOriginal: 'Candidate original',
   parseIssueResolved: 'Review resolution saved',
   parseTitle: 'Parsing and learning status',

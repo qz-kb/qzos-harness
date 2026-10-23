@@ -164,3 +164,14 @@ export async function saveKnowledge(id: string | null, draft: PreviewValues, sig
   }
   await knowledgeRequest(`/kb.know/${id ? 'edit' : 'add'}`, { ...id ? { id: Number(id) } : { embedding_model_id: Number(draft.embedding_model_id) }, name: draft.name, intro: draft.intro, image, documents_model_id: Number(draft.documents_model_id?.split(':')[0]), documents_model_sub_id: Number(draft.documents_model_id?.split(':')[1] ?? draft.documents_model_sub_id) }, signal, token)
 }
+
+/** Translate form controls to the existing retrieval API contract.
+ * @param draft - Current search form values.
+ * @returns Numeric limits, model identities and the server search mode.
+ */
+export function knowledgeSearchInput(draft: PreviewValues): LoginRecord {
+  const numbers = Object.fromEntries(['search_tokens', 'search_similar', 'ranking_status', 'ranking_score', 'ranking_model', 'optimize_ask']
+    .map(key => [key, Number(draft[key]) || 0]))
+  return { ...numbers, search_mode: draft.search_mode === 'semantic' ? 'similar' : draft.search_mode,
+    optimize_m_id: Number(draft.optimize_m_id?.split(':')[0]) || 0, optimize_s_id: Number(draft.optimize_m_id?.split(':')[1]) || 0 }
+}

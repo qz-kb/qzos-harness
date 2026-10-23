@@ -45,3 +45,29 @@ it('does not retrieve for an employee without knowledge', async () => {
   expect(await employeeContext('7','Task',signal)).toContain('\"sources\":[]')
   expect(fetcher).toHaveBeenCalledTimes(1)
 })
+
+it('keeps verified file/version/coordinates in each fresh turn while excluding private source fields', async () => {
+  const { fetcher, signal } = setup()
+  const hit = { question: 'Policy', answer: '19', fd_id: 8, version: 1, uuid: 'chunk-v1', file: { id: 8, name: 'Policy.pdf', path: '/private/original' }, parse_location: { page: 2, paragraph: null, source_refs: [{ page: 2, internal_path: '/secret' }], method: 'manual', object_id: 'secret-object' } }
+  fetcher.mockResolvedValueOnce(reply(employee)).mockResolvedValueOnce(reply([hit]))
+    .mockResolvedValueOnce(reply(employee)).mockResolvedValueOnce(reply([{ ...hit, answer: '23', version: 2, uuid: 'chunk-v2' }]))
+  const first = await employeeContext('7', 'Policy?', signal)
+  const next = await employeeContext('7', 'Policy now?', signal)
+  expect(first).toContain('"version":1')
+  expect(next).toContain('"version":2')
+  expect(next).toContain('"source_refs":[{"page":2}]')
+  expect(next).toContain('Policy.pdf')
+  expect(next).not.toContain('secret')
+  expect(next).not.toContain('/private')
+  expect(next).not.toContain('chunk-v1')
+})
+
+it.each([
+  { page: null, paragraph: 1, sheet: '预算', cell_range: 'B2:C9', source_refs: [{ sheet: '预算', cell_range: 'B2:C9' }] },
+  { page: null, paragraph: 1, slide: 3, source_refs: [{ slide: 3 }] },
+])('retains spreadsheet and slide coordinates with absent PDF page: %j', async (location) => {
+  const { fetcher, signal } = setup()
+  fetcher.mockResolvedValueOnce(reply(employee)).mockResolvedValueOnce(reply([{ question: 'Source', answer: 'Evidence', parse_location: location }]))
+  const result = await employeeContext('7', 'Source?', signal)
+  expect(JSON.parse(result.slice(result.indexOf('\n') + 1))).toMatchObject({ sources: [{ excerpts: [{ parse_location: location }] }] })
+})

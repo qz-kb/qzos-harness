@@ -5,6 +5,7 @@ import type { PanelProps } from './Panel.tsx'
 import { knowledgeRequest, knowledgeRows, knowledgeText } from './knowledge-client.ts'
 import { loginRecord, storedLogin, LoginError, type LoginRecord } from './login-client.ts'
 import { parseOperation, submitParse, reviewFields, reviewChanges, type ParseAction, type ParseOperation } from './knowledge-parse.ts'
+import { sourceLocation } from './knowledge-source.ts'
 import css from './Resources.module.css'
 
 type ParseProps = PanelProps & { kb: string; fd: string; name: string; editable: boolean; onClose: () => void; onChanged: () => void }
@@ -28,7 +29,8 @@ function ParseContent({ value, refresh, editable, t }: ParseProps & { value: Log
   const processing = status.processing ? loginRecord(status.processing) : null
   const review = value.review ? loginRecord(value.review) : null
   const result = review ? loginRecord(review.result) : null
-  const fields = result ? reviewFields(result) : []
+  const sourceLabels = { page: t('sourcePage'), slide: t('sourceSlide'), sheet: t('sourceSheet'), cells: t('sourceCells'), paragraph: t('sourceParagraph'), missing: t('sourceMissing') }
+  const fields = result ? reviewFields(result, sourceLabels) : []
   const issues = result ? knowledgeRows(result.issues) : []
   const allowed = processing && Array.isArray(processing.actions) ? processing.actions : status.can_retry === true ? ['retry'] : []
   const [drafts, setDrafts] = useState<Record<string, Record<string, string>>>({})
@@ -74,7 +76,7 @@ function ParseContent({ value, refresh, editable, t }: ParseProps & { value: Log
     finally { pending.current = false; setBusy(false) }
   }
   const locked = busy || operation !== null || !editable
-  const labels = { review: 'parseReview', retry: 'parseRetry', cancel: 'parseCancel', continue: 'parseContinue', replace: 'parseReplace' } as const
+  const labels = { review: 'parseReview', retry: 'parseRetry', cancel: 'parseCancel', continue: 'parseContinue', replace: 'parseReplace', correct: 'parseCorrect' } as const
   return <div className={css.formFields}>
     <div role="status"><strong>{knowledgeText(status.status_msg) || t('parseNone')}</strong><p>{t('parseVersions')}: {knowledgeText(status.current_version)} / {knowledgeText(status.candidate_version) || '—'}</p>
       {processing && <p>{t('parseProgress')}: {knowledgeText(processing.completed_units)} / {knowledgeText(processing.total_units)}</p>}
@@ -94,14 +96,14 @@ function ParseContent({ value, refresh, editable, t }: ParseProps & { value: Log
       {issues.map((issue) => {
         const id = knowledgeText(issue.id)
         return <fieldset key={id} disabled={locked}><legend>{knowledgeText(issue.message ?? issue.code)}</legend>
-          <p>{issue.source_ref ? Object.values(loginRecord(issue.source_ref)).filter(value => typeof value === 'string' || typeof value === 'number').map(knowledgeText).join(' / ') : ''}</p>
+          <p>{issue.source_ref ? sourceLocation(loginRecord(issue.source_ref), sourceLabels) : ''}</p>
           {['IMAGE_CONTENT_UNRESOLVED', 'PAGE_CONTENT_UNRESOLVED', 'CHART_IMAGE_UNRESOLVED'].includes(knowledgeText(issue.code)) && <label>{t('parseMissing')}<textarea rows={4} value={corrections[id] ?? ''} onChange={(event) => { setCorrections(current => ({ ...current, [id]: event.target.value })) }} /></label>}
           {Boolean(issue.resolution) ? <p>{t('parseIssueResolved')}</p> : issue.code === 'TABLE_STRUCTURE_UNRESOLVED' ? <p>{t('parseReplaceHint')}</p> : <label><input type="checkbox" checked={confirmed.includes(id)} onChange={(event) => { setConfirmed(current => event.target.checked ? [...current, id] : current.filter(value => value !== id)) }} />{t('parseIssueConfirmed')}</label>}
         </fieldset> })}
       <div className={css.inline}><Button disabled={locked} onClick={() => { void perform('review') }}>{t('parseSaveDraft')}</Button><Button variant="primary" disabled={locked} onClick={() => { setAction('review') }}>{t('parseConfirmLearn')}</Button></div>
     </>}
-    <div className={css.inline}>{(['retry', 'continue', 'replace', 'cancel'] as const).filter(key => allowed.includes(key)).map(key => <Button key={key} disabled={locked} onClick={() => { setAction(key) }}>{t(labels[key])}</Button>)}</div>
-    {action && !operation && <fieldset disabled={busy}><legend>{t(labels[action])}</legend><p>{t(action === 'cancel' ? 'parseCancelHint' : action === 'review' ? 'parseConfirmHint' : 'parseOperationHint')}</p>
+    <div className={css.inline}>{(['correct', 'retry', 'continue', 'replace', 'cancel'] as const).filter(key => allowed.includes(key)).map(key => <Button key={key} disabled={locked} onClick={() => { setAction(key) }}>{t(labels[key])}</Button>)}</div>
+    {action && !operation && <fieldset disabled={busy}><legend>{t(labels[action])}</legend><p>{t(action === 'correct' ? 'parseCorrectHint' : action === 'cancel' ? 'parseCancelHint' : action === 'review' ? 'parseConfirmHint' : 'parseOperationHint')}</p>
       {action === 'retry' && processing && <label><input type="checkbox" checked={unknownUsage} onChange={(event) => { setUnknownUsage(event.target.checked) }} />{t('parseUsageHint')}</label>}
       {action === 'replace' && <Input type="file" accept=".pdf,.xlsx,.pptx" aria-label={t('parseSelectFile')} onChange={(event) => { setReplacement(event.target.files?.[0] ?? null) }} />}
       <div className={css.inline}><Button onClick={() => { setAction(null) }}>{t('parseBack')}</Button><Button variant="primary" disabled={action === 'replace' && !replacement} onClick={() => { void perform(action, action === 'review') }}>{t('parseConfirm')}</Button></div>

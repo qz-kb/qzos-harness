@@ -55,3 +55,5 @@ Retrieval messages carry the `qzos-employee-context` source with `snapshot` form
 Verification details are maintained in the original Product task.
 
 </details>
+
+Each authorized excerpt retains allowlisted file identity, name, version, fragment ID and verified parse coordinates from QZOS. The logged context asks the model to cite these fields and never invent missing locations. Native Chat continues to hide the context message; readable answer citations remain visible.

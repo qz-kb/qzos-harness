@@ -1,6 +1,6 @@
 /** Real transport behavior without contacting external providers. */
 import { afterEach, expect, it, vi } from 'vitest'
-import { knowledgeRequest, knowledgePages, knowledgeTable, saveKnowledge } from '../src/client/knowledge-client.ts'
+import { knowledgeSearchInput, knowledgeRequest, knowledgePages, knowledgeTable, saveKnowledge } from '../src/client/knowledge-client.ts'
 import { loginApi, loginSessionKey } from '../src/client/login-client.ts'
 
 function setup() {
@@ -42,4 +42,15 @@ it('reads all pages and rejects a truncated collection', async () => {
 it('maps server member identities and learning states without fabricated values', () => {
   expect(knowledgeTable([{ id: 0, sn: 42, nickname: 'Owner', power: 1, owned: 1 }], 'members')[0]).toMatchObject({ id: '0', sn: '42', role: 'owner' })
   expect(knowledgeTable([{ uuid: 'fragment-1', status: 1, tokens: 12 }], 'fragments')[0]).toMatchObject({ id: 'fragment-1', status: 'learning', consumed: '12' })
+})
+
+it('sends semantic search using the server mode and paired optimization model identity', async () => {
+  const { fetcher } = setup(); fetcher.mockResolvedValue(reply([{ question: 'Current fact', version: 2 }]))
+  const input = knowledgeSearchInput({ search_mode: 'semantic', search_tokens: '3000', search_similar: '0.6', optimize_m_id: '411:40011' })
+  expect(await knowledgeRequest('/kb.teach/tests', { ...input, kb_id: 8, question: 'Policy?' })).toEqual([{ question: 'Current fact', version: 2 }])
+  const body = fetcher.mock.calls[0]?.[1]?.body
+  if (typeof body !== 'string') throw new Error('Missing request body')
+  expect(JSON.parse(body)).toMatchObject({ search_mode: 'similar', search_tokens: 3000, search_similar: 0.6, optimize_m_id: 411, optimize_s_id: 40011 })
+  expect(knowledgeSearchInput({ search_mode: 'full' }).search_mode).toBe('full')
+  expect(knowledgeSearchInput({ search_mode: 'mix' }).search_mode).toBe('mix')
 })

@@ -2,6 +2,7 @@
 import { expect, it, vi } from 'vitest'
 import { parseOperation, submitParse, reviewChanges, reviewFields } from '../src/client/knowledge-parse.ts'
 
+const labels = { page: '页码', slide: '幻灯片', sheet: '工作表', cells: '单元格', paragraph: '段落', missing: '未提供精确位置' }
 const status = { kb_id: 2, fd_id: 9, job_key: 'candidate-one', status: 2, current_version: 1, candidate_version: 2, processing: { revision: 4, actions: ['review', 'retry', 'cancel'], stage: 'review' } }
 it('uses candidate actions and integer revision even when parsing already succeeded', () => {
   const operation = parseOperation(status, 'review', { confirm: true, changes: [], confirm_issue_ids: [] })
@@ -32,7 +33,7 @@ it('emits only edited facts, retaining cell and chart coordinates and real corre
     { id: 'text', type: 'text', data: { text: 'Old policy' } },
     { id: 'table', type: 'table', data: { cells: [{ row: 2, col: 3, value: '17', display_text: '17 days' }] } },
     { id: 'chart', type: 'chart', data: { series: [{ name: 'Series', unit: 'days', points: [{ index: 0, value: '17', category: 'May' }] }] } },
-  ] })
+  ] }, labels)
   expect(reviewChanges(fields, {}, [], {})).toEqual([])
   expect(reviewChanges(fields, { text: { text: 'New policy' }, 'table:2:3': { value: '23', display_text: '23 days' }, 'chart:0:0': { value: '23', category: 'June', unit: 'days' } }, [{ id: 'missing' }], { missing: 'Approved on day 23' })).toEqual([
     { element_id: 'text', text: 'New policy' },
@@ -40,4 +41,15 @@ it('emits only edited facts, retaining cell and chart coordinates and real corre
     { element_id: 'chart', series: 0, index: 0, value: '23', category: 'June', unit: 'days' },
     { issue_id: 'missing', text: 'Approved on day 23' },
   ])
+})
+
+it('creates a correction against the effective version, not the cancelled candidate revision', () => {
+  const current = { ...status, current_version: 2, candidate_version: 3, processing: { revision: 8, actions: ['correct'], cancelled: true } }
+  const operation = parseOperation(current, 'correct')
+  expect(operation.path).toBe('/kb.teach/parseCorrect')
+  const { request_id, ...body } = operation.body
+  expect(request_id).toMatch(/^[a-z0-9-]{8,128}$/)
+  expect(body).toEqual({ kb_id: 2, fd_id: 9, expected_version: 2 })
+  expect(() => parseOperation({ ...current, current_version: 0 }, 'correct')).toThrow()
+  expect(() => parseOperation(status, 'correct')).toThrow()
 })
