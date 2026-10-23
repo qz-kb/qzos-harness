@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button, Input, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
-import { loginApi, loginSessionKey, loginRecord, loginRequest, storedLogin, LoginError, type LoginRecord } from './login-client.ts'
+import { managedAccount, loginApi, loginSessionKey, loginRecord, loginRequest, storedLogin, LoginError, type LoginRecord } from './login-client.ts'
 import type { createQzosStore } from './store.ts'
 import { employeeHost } from './employee-host.ts'
 import css from './Login.module.css'
@@ -165,6 +165,14 @@ export function Login({ t, actions }: PropsLocale<'qzos'> & PropsStore<ReturnTyp
     finally { if (!lifetime.current.signal.aborted) setBusy(false) }
   }
   const signOut = async () => {
+    if (managedAccount) {
+      try {
+        const response = await fetch(new URL('_qzos/logout', document.baseURI), { method: 'POST', credentials: 'same-origin' })
+        if (!response.ok) throw new Error(t('loginLogoutUnknown'))
+        globalThis.location.assign('/')
+      } catch (failure) { error(failure) }
+      return
+    }
     const saved = token.current
     clear(); setMessage(''); setBusy(true)
     try {

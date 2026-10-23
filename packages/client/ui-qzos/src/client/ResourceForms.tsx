@@ -28,7 +28,7 @@ export function ResourceFields({ form, draft, onChange, knowledge, editing, disa
     const id = `${prefix}-${field.id}`
     const value = draft[field.id] ?? field.initial
     const locked = disabled || disabledFields?.includes(field.id) || (editing && field.locked) || (form === 'employeeFlow' && field.id !== 'flow_status')
-    const savedOnly = form.startsWith('employee') && ['model_id', 'temperature', 'context_num', 'ranking_status', 'ranking_score', 'ranking_model', 'optimize_ask', 'optimize_m_id', 'search_empty_type', 'search_empty_text', 'support_file', 'icons', 'is_show_context', 'is_show_quote', 'is_show_feedback', 'related_issues_num', 'welcome_introducer', 'copyright'].includes(field.id)
+    const savedOnly = form.startsWith('employee') && ['model_id', 'context_num', 'search_empty_type', 'search_empty_text', 'support_file', 'icons', 'is_show_context', 'is_show_quote', 'is_show_feedback', 'related_issues_num', 'welcome_introducer', 'copyright'].includes(field.id)
     return <div className={css.formRow} key={field.id}>
       <label htmlFor={id}>{field.required && <span className={css.required} aria-hidden="true">*</span>}{t(field.label)}</label>
       <div className={css.formControl}>
@@ -45,6 +45,7 @@ export function ResourceFields({ form, draft, onChange, knowledge, editing, disa
                     reader.readAsDataURL(file)
                   }} /></label><small>{t(resourceCopy[form.startsWith('knowledge') ? 'coverSize' : 'avatarSize'])}</small></>
                     : <Input id={id} type={field.id === 'api_token' || field.id === 'password' ? 'password' : 'text'} value={value} required={field.required} disabled={locked} onChange={(event) =>{  onChange(field.id, event.target.value) }} />}
+        {form.startsWith('employee') && ['temperature', 'ranking_status', 'ranking_score', 'ranking_model', 'optimize_ask', 'optimize_m_id'].includes(field.id) && <small>{t('employeeNextTurn')}</small>}
         {savedOnly && <small>{t(field.id === 'model_id' ? 'employeeWindowModel' : 'employeeSavedOnly')}</small>}
         {field.locked && <small>{t(resourceCopy.modelLocked)}</small>}
       </div>

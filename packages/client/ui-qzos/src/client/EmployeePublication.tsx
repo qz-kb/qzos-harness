@@ -4,13 +4,18 @@ import QRCode from 'qrcode/lib/browser.js'
 import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
-import { loginApi } from './login-client.ts'
+import { publicVisitorApi } from './login-client.ts'
 import { publicationEmbed, publicationUrl } from './publication-client.ts'
 import css from './Resources.module.css'
 
 /** Preview an artifact for an already-created public publication. */
-export function EmployeePublication({ t, publicId, type, name, poster, onClose }: PropsLocale<'qzos'> & { publicId: string; type: number; name: string; poster: boolean; onClose: () => void }) {
-  const url = publicationUrl(loginApi, publicId, type)
+type PublicationProps = PropsLocale<'qzos'> & { publicId: string; type: number; name: string; poster: boolean; onClose: () => void }
+export function EmployeePublication(props: PublicationProps) {
+  if (!publicVisitorApi) return <Modal open onClose={props.onClose} title={props.t('publicationArtifacts')} closeLabel={props.t('loginClose')}><p>{props.t('publicationOriginRequired')}</p></Modal>
+  return <PublicationArtifact {...props} />
+}
+function PublicationArtifact({ t, publicId, type, name, poster, onClose }: PublicationProps) {
+  const url = publicationUrl(publicVisitorApi, publicId, type)
   const [instance] = useState(randomUUID)
   const embed = publicationEmbed(url, instance)
   const [png, setPng] = useState('')

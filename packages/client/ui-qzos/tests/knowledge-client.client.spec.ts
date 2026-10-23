@@ -1,6 +1,6 @@
 /** Real transport behavior without contacting external providers. */
 import { afterEach, expect, it, vi } from 'vitest'
-import { knowledgeSearchInput, knowledgeRequest, knowledgePages, knowledgeTable, saveKnowledge } from '../src/client/knowledge-client.ts'
+import { readConnections, knowledgeSearchInput, knowledgeRequest, knowledgePages, knowledgeTable, saveKnowledge } from '../src/client/knowledge-client.ts'
 import { loginApi, loginSessionKey } from '../src/client/login-client.ts'
 
 function setup() {
@@ -53,4 +53,18 @@ it('sends semantic search using the server mode and paired optimization model id
   expect(JSON.parse(body)).toMatchObject({ search_mode: 'similar', search_tokens: 3000, search_similar: 0.6, optimize_m_id: 411, optimize_s_id: 40011 })
   expect(knowledgeSearchInput({ search_mode: 'full' }).search_mode).toBe('full')
   expect(knowledgeSearchInput({ search_mode: 'mix' }).search_mode).toBe('mix')
+})
+
+it('keeps authorized connections and history when the market is disabled, but propagates authorization failures', async () => {
+  const { fetcher } = setup()
+  fetcher.mockResolvedValueOnce(reply([{ id: 1 }]))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ code: 0, msg: 'MARKET_DISABLED' })))
+    .mockResolvedValueOnce(reply([{ id: 7, status: 'success' }]))
+  expect(await readConnections(new AbortController().signal)).toEqual({
+    rows: [{ id: 1 }], requests: [], calls: [{ id: 7, status: 'success' }], marketDisabled: true,
+  })
+  fetcher.mockResolvedValueOnce(reply([]))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ code: -1, msg: 'expired' })))
+    .mockResolvedValueOnce(reply([]))
+  await expect(readConnections(new AbortController().signal)).rejects.toThrow('expired')
 })

@@ -2616,6 +2616,12 @@ export type Config = BusinessConfig & {
     /** Environment-variable name holding the shared Host/server signing secret. */
     secretEnv: string
   }
+  /** Backend user ID assigned to a dedicated Host; never supplied by the browser. */
+  ownerUserId?: string
+  /** Serve private UI through the authenticated enterprise gateway. Requires ownerUserId. */
+  managedGateway?: boolean
+  /** Browser-reachable origin serving public visitor pages; independent of the private gateway. */
+  publicVisitorOrigin?: string
 }
 
 /** Fixed backend origin and request deadline supplied by the plugin configuration. */

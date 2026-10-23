@@ -1,7 +1,7 @@
 /** QZOS knowledge transport and native DSH resource provider. */
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-resources/client'
-import { loginApi, loginRecord, storedLogin, LoginError, type LoginRecord } from './login-client.ts'
+import { loginApi, loginCredentials, managedAccount, loginRecord, storedLogin, LoginError, type LoginRecord } from './login-client.ts'
 import type { Example } from './catalog.ts'
 import type { PreviewRow } from './resource-fixtures.ts'
 import type { PreviewValues } from './resource-schema.ts'
@@ -40,11 +40,12 @@ export async function knowledgeRequest(
   if (expectedToken !== undefined && expectedToken !== token) throw new LoginError('登录账号已变更，请重新打开页面', -1)
   if (!token) throw new LoginError('请先登录 QZOS', -1)
   const response = await fetch(`${loginApi}${path}`, {
-    method: body ? 'POST' : 'GET', credentials: 'omit', redirect: 'error', cache: 'no-store',
+    method: body ? 'POST' : 'GET', credentials: loginCredentials, redirect: 'error', cache: 'no-store',
     headers: { terminal: '4', version: '4.8.0', token, ...body instanceof FormData ? {} : { 'Content-Type': 'application/json' } },
     ...body ? { body: body instanceof FormData ? body : JSON.stringify(body) } : {},
     signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(60000)]) : AbortSignal.timeout(60000),
   })
+  if (managedAccount && [401, 403].includes(response.status)) globalThis.location.assign('/')
   if (storedLogin(sessionStorage) !== token) throw new LoginError('登录账号已变更，请重新打开页面', -1)
   const result = loginRecord(await response.json().catch(() => { throw new Error(`QZOS HTTP ${response.status}`) }))
   if (!response.ok && typeof result.msg !== 'string') throw new Error(`QZOS HTTP ${response.status}`)
@@ -67,6 +68,23 @@ export async function knowledgePages(path: string, signal?: AbortSignal): Promis
     result.push(...rows)
     if (result.length >= total) return result
   }
+}
+/** Read local connections/history even when new market requests are disabled.
+ * @param signal - Owning resource lifetime.
+ * @returns Authorized local rows and explicit market availability.
+ */
+export async function readConnections(signal: AbortSignal): Promise<LoginRecord> {
+  let marketDisabled = false
+  const [rows, requests, calls] = await Promise.all([
+    knowledgeRequest('/plugin.connection/available', undefined, signal),
+    knowledgeRequest('/plugin.request/mine', undefined, signal).catch((error: unknown) => {
+      if (!(error instanceof LoginError) || error.message !== 'MARKET_DISABLED') throw error
+      marketDisabled = true
+      return []
+    }),
+    knowledgeRequest('/plugin.connection/calls', undefined, signal),
+  ])
+  return { rows: knowledgeRows(rows), requests: knowledgeRows(requests), calls: knowledgeRows(calls), marketDisabled }
 }
 /** Register API reads under the framework resource lifecycle; refresh changes the address revision.
  * @param ctx - Plugin context owning resource registration.
@@ -97,6 +115,18 @@ export function installKnowledgeResources(ctx: Context): void {
             ])
             value = { categories: knowledgeRows(categories), ...loginRecord(page), used: knowledgeRows(used) }; break
           }
+          case 'capability-skills': value = { rows: knowledgeRows(await knowledgeRequest('/skill.skill/lists', undefined, signal)) }; break
+          case 'capability-connectors': value = await readConnections(signal); break
+          case 'capability-templates': {
+            const [groups, models] = await Promise.all([
+              knowledgeRequest('/chat.skill/lists', undefined, signal), knowledgeRequest('/index/models', undefined, signal),
+            ])
+            value = {
+              rows: knowledgeRows(groups).flatMap(group => knowledgeRows(group.skill).map(row => ({ ...row, category: group.name }))),
+              models: loginRecord(models),
+            }; break
+          }
+          case 'capability-market': value = { rows: knowledgeRows(loginRecord(await knowledgeRequest('/market.catalog/lists', undefined, signal)).resources) }; break
           case 'employee-skills': {
             const [rows, bindings] = await Promise.all([knowledgeRequest('/skill.skill/lists', undefined, signal), knowledgeRequest(`/skill.skill/bindings?robot_id=${id}`, undefined, signal)])
             value = { rows: knowledgeRows(rows), bound: knowledgeRows(loginRecord(bindings).skills) }; break

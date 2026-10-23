@@ -6,6 +6,7 @@
  */
 export function publicationUrl(apiUrl: string, publicId: string, type: number): string {
   if (![1, 2].includes(type) || !publicId || publicId.length > 200) throw new Error('Public publication required')
+  if (!apiUrl) throw new Error('请先配置公开访客入口地址 / Public visitor origin is not configured')
   const api = new URL(apiUrl)
   if (!['http:', 'https:'].includes(api.protocol) || api.username || api.password) throw new Error('Invalid publication origin')
   return `${api.origin}/chat/${encodeURIComponent(publicId)}`

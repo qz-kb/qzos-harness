@@ -71,3 +71,16 @@ it.each([
   const result = await employeeContext('7', 'Source?', signal)
   expect(JSON.parse(result.slice(result.indexOf('\n') + 1))).toMatchObject({ sources: [{ excerpts: [{ parse_location: location }] }] })
 })
+
+it('forwards current rerank and query optimization settings without changing the answer model', async () => {
+  const { fetcher, signal } = setup()
+  fetcher.mockResolvedValueOnce(reply({
+    ...employee, model_id: 77, ranking_status: 1, ranking_score: 0.3, ranking_model: 8,
+    optimize_ask: 1, optimize_m_id: 9, optimize_s_id: 10,
+  })).mockResolvedValueOnce(reply([]))
+  await employeeContext('7', 'Question', signal)
+  const body = JSON.parse(fetcher.mock.calls[1]?.[1]?.body as string) as Record<string, unknown>
+  expect(body).toMatchObject({
+    ranking_status: 1, ranking_score: 0.3, ranking_model: 8, optimize_ask: 1, optimize_m_id: 9, optimize_s_id: 10 })
+  expect(body).not.toHaveProperty('model_id')
+})

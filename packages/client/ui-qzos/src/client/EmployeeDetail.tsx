@@ -17,7 +17,7 @@ import css from './Resources.module.css'
 import { publicationArtwork } from './resource-artwork.ts'
 import { employeeDraft, saveEmployee } from './employee-client.ts'
 import { knowledgeDraft, knowledgeRows, knowledgeText, knowledgeRequest } from './knowledge-client.ts'
-import { loginApi, loginRecord, storedLogin, type LoginRecord } from './login-client.ts'
+import { publicVisitorApi, loginRecord, storedLogin, type LoginRecord } from './login-client.ts'
 import type { QzosKey } from './locales.ts'
 
 const emptyRows: readonly PreviewRow[] = []
@@ -183,7 +183,7 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
           <ResourceTable rows={shares} r={r} columns={channel === 'api' ? [['status', 'status'], ['key', 'appSecret'], ['name', 'name'], ['lastUsed', 'lastUsed']] : [['status', 'status'], ['entryId', 'entryId'], ['name', 'shareName'], ['password', 'password'], ['mode', 'mode'], ['lastUsed', 'lastUsed']]}
             cell={(row, key) => key === 'status' ? r(row.status === 'enabled' ? 'enabled' : 'disabled') : key === 'password' ? row.password ? '••••••' : '—' : row[key] ?? '—'} actions={row => [
               { label: row.status === 'enabled' ? 'deactivate' : 'enabled', run: () => { void perform(async () => { await request('/kb.publish/manage', { id: Number(row.id), action: row.status === 'enabled' ? 'disable' : 'enable' }); refresh() }) } },
-              ...channel === 'api' ? [{ label: 'manageKeys' as const, run: () =>{  show('keys', row) } }] : [{ label: 'copyLink' as const, run: () => { void perform(async () => { await navigator.clipboard.writeText(publicationUrl(loginApi, row.entryId ?? '', Number(row.type))); setNotice(t('publicationCopied')) }) } }, { label: 'edit' as const, run: () =>{  show('share', row) } }, { label: 'preview' as const, run: () => { setPublicArtifact({ row, poster: false }) } }, ...channel === 'js' ? [{ label: 'js' as const, run: () => { setPublicArtifact({ row, poster: false }) } }] : [{ label: 'generatePoster' as const, run: () => { setPublicArtifact({ row, poster: true }) } }]],
+              ...channel === 'api' ? [{ label: 'manageKeys' as const, run: () =>{  show('keys', row) } }] : [{ label: 'copyLink' as const, run: () => { void perform(async () => { await navigator.clipboard.writeText(publicationUrl(publicVisitorApi, row.entryId ?? '', Number(row.type))); setNotice(t('publicationCopied')) }) } }, { label: 'edit' as const, run: () =>{  show('share', row) } }, { label: 'preview' as const, run: () => { setPublicArtifact({ row, poster: false }) } }, ...channel === 'js' ? [{ label: 'js' as const, run: () => { setPublicArtifact({ row, poster: false }) } }] : [{ label: 'generatePoster' as const, run: () => { setPublicArtifact({ row, poster: true }) } }]],
               { label: 'usageSettings', run: () =>{  show('quota', row) } }, { label: 'delete', run: () =>{  setConfirmation({ key: sharesKey, ids: [row.id] }) } },
             ]} />
         </>}
