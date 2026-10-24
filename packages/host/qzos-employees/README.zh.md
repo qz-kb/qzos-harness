@@ -84,3 +84,5 @@ Web 组合与 ui-qzos 一起加载本私有插件。`apiUrl` 指定本机 QZOS A
 可选真实撤权测试 `tests/access-live.spec.ts` 使用 `QZOS_LIVE_ACCESS_DIR` 指定本机隔离合成夹具目录。目录需有 `member-account.json`、`member.json`、`access-state.json`（kb_id、employee、rule、body、url）和 `correction.pdf`，父目录为已有 owner `account.json`。测试独占夹具锁，真实登录并在同一绑定 Agent 内验证引用撤权／恢复、移除成员后的下一轮拒绝和原件下载拒绝；退出恢复合成成员与授予规则并释放 Host。仅对明确准备的可变合成夹具启用，不创建语言模型调用。
 
 托管公开分享可配置 `publicVisitorOrigin`，仅允许无凭据、无路径的 HTTP(S) origin；该公开地址注入私有 UI，不使用容器内部 API 地址生成访客链接。真实双容器验证覆盖历史、文件、终端、重启持久化及退出撤权；企业后端／模型与签名回执在多容器组合下仍需部署配置验证。
+
+执行日志在发送 begin 前持久化放行参数。放行响应丢失后，恢复复用同一调用身份；由于尚未进入供应商，按确定的零用量结清，不生成空回答。旧日志没有放行参数时仍按未知用量恢复。明确的放行拒绝会删除本地条目；网络或服务失败保留条目。

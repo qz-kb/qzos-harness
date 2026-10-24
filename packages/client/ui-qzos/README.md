@@ -86,3 +86,5 @@ The current private UI adds server-prepared QA/text and two-column CSV/XLSX impo
 Public sharing requires the matching QZOS PC static application with visitor-session support. Local verification builds existing PC source `05b225b` without editing it; generating a link does not repair an outdated visitor bundle.
 
 Managed mode uses `publicVisitorOrigin` for the separate public visitor site; an absent origin refuses links that would point into the private gateway. Original and offline-package downloads use same-origin gateway cookies without credentials in URLs. Templates must be enabled role templates, preventing private form-skill access through template IDs. Creation rereads the employee name and model and never inherits knowledge permissions.
+
+QA and CSV previews retain a document request ID across submission retries. The server acknowledges completed replays without creating another file or learning task; conflicting input or an unfinished receipt remains an explicit error.

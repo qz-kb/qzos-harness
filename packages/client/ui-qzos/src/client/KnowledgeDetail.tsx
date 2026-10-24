@@ -158,7 +158,7 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
       }
       const preview = loginRecord(await knowledgeRequest('/kb.teach/importPreview', { kb_id: Number(item.id), method, object_id: objectId, segment_length: segmentLength }))
       const rows = knowledgeRows(preview.rows)
-      imports.current.set(file, { kb_id: Number(item.id), method, documents: [{ name: file.name, path: '', object_id: objectId, data: rows.map(row => ({ q: row.q, a: row.a })) }] })
+      imports.current.set(file, { kb_id: Number(item.id), method, documents: [{ request_id: randomUUID(), name: file.name, path: '', object_id: objectId, data: rows.map(row => ({ q: row.q, a: row.a })) }] })
       prepared.push(...rows)
     }
     setPreviews(prepared)

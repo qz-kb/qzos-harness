@@ -19,8 +19,14 @@ const usageSchema = z.object({
 })
 const journal = metadata.extend({
   sessionId: z.string(), callId: z.string(), reply: z.string(), usage: usageSchema.nullable(), issued: z.boolean(),
+  registration: z.object({
+    call_id: z.string(), robot_id: z.number(), session_id: z.string(), turn_id: z.string(),
+    provider: z.string(), model: z.string(), purpose: z.string(), question: z.string(),
+    sources: z.array(z.record(z.string(), z.unknown())),
+  }).optional(),
 })
 const spec = defineDomain({ name: 'qzos_execution', version: 1, tables: { turns: domainTable(metadata), receipts: domainTable(journal) } })
+class ReceiptRefused extends Error {}
 /** Immutable credential captured before one operation. */
 export interface Credential { userId: string; token: string }
 /** Normalize provider counters; absent or inconsistent totals stay unknown.
@@ -63,7 +69,16 @@ export async function execution(
       signal: AbortSignal.any([signal, AbortSignal.timeout(config.requestTimeoutMs)]),
     })
     const result = z.object({ code: z.number(), msg: z.string().optional(), data: z.unknown() }).parse(await response.json())
-    if (!response.ok || result.code !== 1) throw new Error(result.msg ?? 'QZOS receipt unavailable')
+    if (result.code !== 1) {
+      const refusal = z.object({ error_code: z.string() }).safeParse(result.data)
+      const rejected = [
+        'DSH_REQUEST_INVALID', 'DSH_CHAT_NOT_LICENSED', 'DSH_ACCOUNT_UNAVAILABLE', 'DSH_EMPLOYEE_UNAVAILABLE',
+        'DSH_WINDOW_MODEL_UNMAPPED', 'DSH_QUOTA_INSUFFICIENT', 'DSH_REQUEST_CONFLICT',
+      ]
+      if (refusal.success && rejected.includes(refusal.data.error_code)) throw new ReceiptRefused(result.msg)
+      throw new Error(result.msg ?? 'QZOS receipt unavailable')
+    }
+    if (!response.ok) throw new Error('QZOS receipt unavailable')
     return result.data
   }
   const drain = async (auth: Credential) => {
@@ -72,6 +87,19 @@ export async function execution(
     const task = (async () => {
       for (const [key, item] of receipts.entries()) {
         if (item.userId !== auth.userId || item.issued) continue
+        if (item.registration) {
+          // The provider was never entered. Replay admission with the same identity,
+          // then close it with exact zero usage; do not create an empty answer.
+          try { await signed(auth, 'begin', item.registration, lifetime.signal) }
+          catch (error) {
+            if (!(error instanceof ReceiptRefused)) throw error
+            await receipts.delete(key)
+            continue
+          }
+          await signed(auth, 'complete', { call_id: item.callId, reply: '', usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } }, lifetime.signal)
+          await receipts.delete(key)
+          continue
+        }
         await signed(auth, 'complete', { call_id: item.callId, reply: item.reply, usage: item.usage }, lifetime.signal)
         await signed(auth, 'finish', { session_id: item.sessionId, turn_id: String(item.turn) }, lifetime.signal)
         await receipts.delete(key)
@@ -97,8 +125,16 @@ export async function execution(
     await employee(config, auth.token, bound.employeeId, options.signal ?? lifetime.signal)
     if (credential() !== auth) throw new Error('QZOS 登录已变化')
     const callId = randomUUID()
-    await signed(auth, 'begin', { call_id: callId, robot_id: Number(bound.employeeId), session_id: session, turn_id: String(turn.turn), provider: options.provider, model: options.model, purpose: options.purpose ?? '', question: turn.question, sources: turn.sources }, options.signal ?? lifetime.signal)
-    let item = { ...turn, sessionId: session, callId, reply: '', usage: null as z.infer<typeof usageSchema> | null, issued: true }
+    const registration = { call_id: callId, robot_id: Number(bound.employeeId), session_id: session, turn_id: String(turn.turn), provider: options.provider, model: options.model, purpose: options.purpose ?? '', question: turn.question, sources: turn.sources }
+    let item: z.infer<typeof journal> = { ...turn, sessionId: session, callId, reply: '', usage: null, issued: true, registration }
+    await receipts.put(callId, item)
+    try { await signed(auth, 'begin', registration, options.signal ?? lifetime.signal) }
+    catch (error) {
+      if (error instanceof ReceiptRefused) await receipts.delete(callId)
+      else await receipts.put(callId, { ...item, issued: false })
+      throw error
+    }
+    item = { ...item, registration: undefined }
     await receipts.put(callId, item)
     let usage: TokenUsage | undefined
     try {
