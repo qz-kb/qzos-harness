@@ -27,6 +27,7 @@ const journal = metadata.extend({
 })
 const spec = defineDomain({ name: 'qzos_execution', version: 1, tables: { turns: domainTable(metadata), receipts: domainTable(journal) } })
 class ReceiptRefused extends Error {}
+class ReceiptTransportError extends Error {}
 /** Immutable credential captured before one operation. */
 export interface Credential { userId: string; token: string }
 /** Normalize provider counters; absent or inconsistent totals stay unknown.
@@ -64,11 +65,18 @@ export async function execution(
   const signed = async (auth: Credential, action: string, data: object, signal: AbortSignal): Promise<unknown> => {
     const body = JSON.stringify(data); const time = String(Math.floor(Date.now() / 1000))
     const signature = createHmac('sha256', secret).update(`${time}\n${action}\n${createHash('sha256').update(auth.token).digest('hex')}\n${body}`).digest('hex')
-    const response = await fetch(`${config.apiUrl}/kb.dsh/${action}`, { method: 'POST', redirect: 'error', body,
-      headers: { token: auth.token, terminal: '4', version: '4.8.0', 'Content-Type': 'application/json', 'X-Qzos-Dsh-Time': time, 'X-Qzos-Dsh-Signature': signature },
-      signal: AbortSignal.any([signal, AbortSignal.timeout(config.requestTimeoutMs)]),
-    })
-    const result = z.object({ code: z.number(), msg: z.string().optional(), data: z.unknown() }).parse(await response.json())
+    let response: Response; let raw: unknown
+    try {
+      response = await fetch(`${config.apiUrl}/kb.dsh/${action}`, { method: 'POST', redirect: 'error', body,
+        headers: { token: auth.token, terminal: '4', version: '4.8.0', 'Content-Type': 'application/json', 'X-Qzos-Dsh-Time': time, 'X-Qzos-Dsh-Signature': signature },
+        signal: AbortSignal.any([signal, AbortSignal.timeout(config.requestTimeoutMs)]),
+      })
+      raw = await response.json()
+    } catch (cause) {
+      if (action !== 'retrieve') throw cause
+      throw new ReceiptTransportError(cause instanceof Error ? cause.message : 'QZOS receipt unavailable', { cause })
+    }
+    const result = z.object({ code: z.number(), msg: z.string().optional(), data: z.unknown() }).parse(raw)
     if (result.code !== 1) {
       const refusal = z.object({ error_code: z.string() }).safeParse(result.data)
       const rejected = [
@@ -152,7 +160,18 @@ export async function execution(
       await drain(auth)
       const hash = createHash('sha256').update(JSON.stringify([auth.userId, session, employeeId, turn, question])).digest('hex')
       const callId = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20, 32)}`
-      return signed(auth, 'retrieve', { call_id: callId, robot_id: Number(employeeId), session_id: session, turn_id: String(turn), question }, signal)
+      const input = { call_id: callId, robot_id: Number(employeeId), session_id: session, turn_id: String(turn), question }
+      try { return await signed(auth, 'retrieve', input, signal) }
+      catch (error) {
+        if (!(error instanceof ReceiptTransportError)) throw error
+        signal.throwIfAborted(); lifetime.signal.throwIfAborted()
+        // One transport recovery only. Server rechecks access and owns durable provider deduplication.
+        try { return await signed(auth, 'retrieve', input, signal) }
+        catch (recoveryError) {
+          if (!(recoveryError instanceof ReceiptTransportError) || signal.aborted || lifetime.signal.aborted) throw recoveryError
+          throw new Error('知识检索连接中断，自动恢复未成功，请稍后重新提问；本次已发生的用量保留核对。')
+        }
+      }
     },
     async prepare(session: SessionId, value: z.infer<typeof metadata>) {
       const previous = turns.get(session)

@@ -116,3 +116,39 @@ it('journals received usage, retries only settlement, and isolates recovery by a
     await bridge.recover(auth);expect(calls.filter(c=>c.action==='complete')).toHaveLength(2)
   } finally { await ctx.fiber.dispose();vi.unstubAllGlobals() }
 })
+
+it('recovers retrieval transport loss with the same identity, but never retries a refusal or cancellation', async () => {
+  const ctx = new Context(), auth = { userId: '1', token: 'synthetic' }, session = SessionId('retrieve-response-loss')
+  const bodies: string[] = []
+  let mode = 'once'
+  const controller = new AbortController()
+  vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
+    if (typeof init?.body !== 'string') throw new Error('Expected retrieval body')
+    bodies.push(init.body)
+    if (mode === 'cancel') { controller.abort(); throw new TypeError('fetch failed') }
+    if (mode === 'always' || (mode === 'once' && bodies.length === 1)) throw new TypeError('fetch failed')
+    if (mode.startsWith('DSH_')) return Response.json({ code: 0, msg: 'refused', data: { error_code: mode } })
+    return Response.json({ code: 1, data: [{ kb_id: 9 }] })
+  })
+  try {
+    await ctx.plugin(Storage); ctx.storage.backend.register('memory', new MemoryStorageBackend())
+    ctx.provide('storageDomain', new DomainFacility(ctx, { backend: 'memory', routes: {} }))
+    const bridge = await execution(ctx, { apiUrl: 'http://qzos.invalid/api', requestTimeoutMs: 1000 }, 's'.repeat(32), () => auth, () => ({ userId: '1', employeeId: '7' }))
+    const retrieve = (turn = 1) => bridge.retrieve(auth, session, '7', turn, 'question', controller.signal)
+    await expect(retrieve()).resolves.toEqual([{ kb_id: 9 }])
+    expect(bodies).toHaveLength(2); expect(bodies[1]).toBe(bodies[0])
+    const original = bodies[0]
+    bodies.length = 0; mode = 'always'
+    await expect(retrieve()).rejects.toThrow('知识检索连接中断')
+    expect(bodies).toHaveLength(2); expect(bodies[1]).toBe(bodies[0])
+    for (const code of ['DSH_RETRIEVAL_USAGE_UNKNOWN', 'DSH_EMPLOYEE_UNAVAILABLE', 'DSH_QUOTA_INSUFFICIENT']) {
+      bodies.length = 0; mode = code
+      await expect(retrieve()).rejects.toThrow('refused'); expect(bodies).toHaveLength(1)
+    }
+    bodies.length = 0; mode = 'success'
+    await retrieve(2); expect(bodies[0]).not.toBe(original)
+    const next = JSON.parse(bodies[0]!) as { turn_id: string }; expect(next.turn_id).toBe('2')
+    bodies.length = 0; mode = 'cancel'
+    await expect(retrieve()).rejects.toThrow(); expect(bodies).toHaveLength(1)
+  } finally { await ctx.fiber.dispose(); vi.unstubAllGlobals() }
+})
