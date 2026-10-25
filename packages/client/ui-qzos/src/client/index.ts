@@ -42,7 +42,7 @@ export function apply(ctx: Context): void {
   ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({ name: 'sidebar.footer.action', id: 'qzos-product-updates', locale: 'qzos', store }, ProductUpdates))
   const openEmployee = installEmployeeMentions(ctx, t)
   const developer = window.sessionStorage.getItem('qzos.preview') === '1'
-  ctx.slots.inject('sidebar.brand.name', () => ctx.slots.register({ name: 'sidebar.brand.name', locale: 'qzos' }, Brand))
+  ctx.slots.inject('sidebar.brand.name', () => ctx.slots.register({ name: 'sidebar.brand.name', priority: -10, locale: 'qzos' }, Brand))
   ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
     name: 'sidebar.panellist', id: 'conversation', order: -110, label: () => t('native'),
   }, NativePanelIcon))

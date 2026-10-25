@@ -8,6 +8,7 @@
     "rewriteRelativeImportExtensions": false
   },
   "include": [
+    "apps/web/tests/qzos-brand.e2e.ts",
     "apps/web/tests/qzos-workbench.e2e.ts",
     "apps/web/tests/qzos-multitenant.e2e.ts",
     "apps/web/tests/collapse-timing.e2e.ts",

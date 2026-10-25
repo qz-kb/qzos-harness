@@ -23,6 +23,8 @@ kind: "package-reference"
 
 Web bundle 挂载 `ui-qzos`，移除这一行即可恢复上游呈现。按根目录 `.node-version` 使用 Node，执行 `pnpm run dev:web --patch apps/web/tests/pin-browse-picker.overlay.yml --port 3081`；启动器参数须放在 Web 参数之前。
 
+QZOS 侧栏名称以插槽优先级 `-10` 覆盖正式构建的默认名称。两个插件可以同时挂载；移除 QZOS 后恢复上游名称。真实浏览器用例 `apps/web/tests/qzos-brand.e2e.ts` 覆盖启动、移除和重新挂载，并已在正式构建配置下验证。
+
 企业托管模式下，私有 Host 注入 `__QZOS_MANAGED_ACCOUNT__`。业务请求使用相对文档基址的 `_qzos/business` 与同源 Cookie，不从浏览器存储恢复业务凭据。HTTP 401/403 返回企业登录入口；退出经网关调用 `_qzos/logout`。注入 ID 仅选择呈现方式，访问权限由网关及业务后端校验。
 
 知识库和员工页面依据现有 QZOS 客户端的 `qzos-pc/src/pages/application/layout/{kb,robot}.vue`、`application/kb/detail/`、`application/robot/setting.vue` 及其子视图还原。封面卡片、成员入口、员工头像与更多菜单、详情侧栏、新建字段和配置分组沿这些原页面；中文原文归语言字典，发布图标复用 QZOS 原资产。连接器、技能、模板继续沿 DSH 插件／自动化任务页面风格。

@@ -22,6 +22,8 @@ This private browser plugin adds knowledge, digital employees, connectors, skill
 
 The Web bundle mounts `ui-qzos`. Removing the row restores the upstream presentation. Run `pnpm run dev:web --patch apps/web/tests/pin-browse-picker.overlay.yml --port 3081` with the root `.node-version`; keep launcher options before Web options.
 
+The QZOS sidebar name shadows the official build's default name at slot priority `-10`. Both plugins can remain mounted; removing QZOS reveals the upstream name again. The real-browser `apps/web/tests/qzos-brand.e2e.ts` check covers startup, removal and remounting, including the official build profile.
+
 In enterprise managed mode, the private Host injects `__QZOS_MANAGED_ACCOUNT__`. Business calls use `_qzos/business` relative to the document base with same-origin cookies; no business credential is restored from browser storage. HTTP 401/403 returns to the enterprise login entry. Sign-out calls `_qzos/logout` through the gateway. The injected ID selects presentation only; the gateway and backend authorize access.
 
 Knowledge and employee presentation follows the existing QZOS client: `qzos-pc/src/pages/application/layout/{kb,robot}.vue`, `application/kb/detail/`, and `application/robot/setting.vue` with its child views. Cover cards, member entry, employee avatars and menus, detail sidebars, creation fields and grouped configuration follow those sources. Chinese source labels are retained in locale dictionaries. Publication artwork comes from the existing QZOS assets. Connectors, skills and templates keep the native Plugins/Automation tasks page style.
