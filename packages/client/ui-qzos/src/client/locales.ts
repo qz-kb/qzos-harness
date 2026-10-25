@@ -1,5 +1,23 @@
 /** Localized controls for QZOS resource previews. */
 export const zh = {
+  updatesAvailable: '服务可更新', updatesCheckUnavailable: '暂时无法检查新版本，以下为已安装包中的更新日志。',
+  updatesTitle: '更新日志',
+  updatesNew: '本次更新内容已就绪',
+  updatesLater: '稍后查看',
+  updatesUnderstood: '知道了',
+  updatesClient: '当前客户端',
+  updatesServer: '服务版本',
+  updatesUnknown: '暂未提供',
+  updatesThisSurface: '当前端',
+  updatesAll: '全部更新',
+  updatesUnavailable: '暂时无法读取更新日志，请刷新重试。',
+  updatesEmpty: '暂无适用于当前端的更新记录。',
+  updatesCurrent: '当前版本',
+  updatesFeature: '新增',
+  updatesImprovement: '优化',
+  updatesFix: '修复',
+  updatesNotice: '提示',
+
   capabilityDependencies: '关联依赖', capabilityTasks: '任务', capabilityRunning: '执行中', capabilityCancel: '取消',
   employeeNextTurn: '保存后下一轮 DSH 员工对话使用；回答模型仍由工作窗口选择。',
   publicationOriginRequired: '请由管理员配置公开访客入口地址后再生成链接。',
@@ -597,6 +615,24 @@ export const zh = {
 } satisfies Record<string, string>
 export type QzosKey = keyof typeof zh
 export const en: Record<QzosKey, string> = {
+  updatesAvailable: 'Server update available', updatesCheckUnavailable: 'Update check unavailable. Showing installed release notes.',
+  updatesTitle: 'Release notes',
+  updatesNew: 'See what changed',
+  updatesLater: 'Later',
+  updatesUnderstood: 'Got it',
+  updatesClient: 'Client',
+  updatesServer: 'Server',
+  updatesUnknown: 'Unknown',
+  updatesThisSurface: 'This app',
+  updatesAll: 'All updates',
+  updatesUnavailable: 'Release notes are unavailable. Refresh to retry.',
+  updatesEmpty: 'No release notes for this app.',
+  updatesCurrent: 'Current',
+  updatesFeature: 'New',
+  updatesImprovement: 'Improved',
+  updatesFix: 'Fixed',
+  updatesNotice: 'Notice',
+
   capabilityDependencies: 'Dependencies', capabilityTasks: 'Tasks', capabilityRunning: 'Running', capabilityCancel: 'Cancel',
   employeeNextTurn: 'Applies on the next DSH employee turn after saving; the work window still selects the answer model.',
   publicationOriginRequired: 'Ask an administrator to configure the public visitor origin before generating links.',

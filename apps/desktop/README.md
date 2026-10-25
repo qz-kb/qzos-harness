@@ -382,3 +382,9 @@ The account provider’s `embeddedPageDist` configuration adds a `dist` query pa
 ## Dev Note
 
 Pre-launch CDN and capacity decisions are tracked in the [Desktop update proposal](../../.agents/notes/proposed/feature/2026-09-08-desktop-update-policy-and-installation.md#cdn-and-capacity-qualification).
+
+## QZOS update deployment
+
+This fork retains DSH's native update coordinator, task shutdown protection, download and restart confirmation. QZOS packages require their own application ID, download origin and policy origin; upstream DeepSeek identities and origins are rejected. Production machine presets must set `DOWNLOAD_PROD_ORIGIN`. Distribution uses `qzos-desktop` keys. The examples use `com.qzos.desktop`; signing identities, certificates and update service configuration must belong to the deployment operator. No signing credentials are shipped with the source.
+
+The shared product history in `ui-qzos` is read-only and identifies QZOS business-client compatibility independently of the bundled upstream DSH runtime version. It does not replace the native updater or turn viewing release notes into consent to install. Signed macOS/Windows installation and restart validation requires the operator's isolated signing configuration and update feed.

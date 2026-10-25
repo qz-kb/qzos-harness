@@ -1,3 +1,4 @@
+import { qzosVersionedUrl, qzosSurface, qzosClientVersion } from './product-updates.ts'
 /** QZOS knowledge transport and native DSH resource provider. */
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-resources/client'
@@ -39,7 +40,7 @@ export async function knowledgeRequest(
   const token = storedLogin(sessionStorage)
   if (expectedToken !== undefined && expectedToken !== token) throw new LoginError('登录账号已变更，请重新打开页面', -1)
   if (!token) throw new LoginError('请先登录 QZOS', -1)
-  const response = await fetch(`${loginApi}${path}`, {
+  const response = await fetch(qzosVersionedUrl(`${loginApi}${path}`), {
     method: body ? 'POST' : 'GET', credentials: loginCredentials, redirect: 'error', cache: 'no-store',
     headers: { terminal: '4', version: '4.8.0', token, ...body instanceof FormData ? {} : { 'Content-Type': 'application/json' } },
     ...body ? { body: body instanceof FormData ? body : JSON.stringify(body) } : {},
@@ -99,6 +100,7 @@ export function installKnowledgeResources(ctx: Context): void {
         const fd = url.searchParams.get('fd') ?? ''
         let value: LoginRecord
         switch (url.pathname.slice(1)) {
+          case 'product-updates': value = loginRecord(await knowledgeRequest(`/productUpdate/overview?surface=${qzosSurface()}&version=${qzosClientVersion}&check=${Number(url.searchParams.get('revision') ?? 0) > 0 ? 1 : 0}`, undefined, signal)); break
           case 'list': {
             const [rows, models] = await Promise.all([knowledgePages('/kb.know/lists?type=0', signal), knowledgeRequest('/index/models', undefined, signal)])
             value = { rows, models }; break
