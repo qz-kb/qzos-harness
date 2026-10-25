@@ -32,6 +32,12 @@ The leading employee reference binds the Session but is omitted from the submitt
 
 Employee entry creates a fresh native Session, names it for the employee and inserts `@employee` without sending. Selecting an employee in an empty composer uses that conversation; selecting one in an existing conversation opens a new one and preserves the old draft. Partial-name/role matching and original file/Session references remain. The first send loads current role settings and searches linked knowledge through QZOS authorization, then serializes only the role and retrieved excerpts into the ordinary DSH message. Disabled/paused/retired employees, invalid knowledge bindings, external workflows and failed retrieval refuse the send and retain the draft. The current or sole Workspace supplies the new Session.
 
+## Product updates
+
+The sidebar footer opens authenticated QZOS release history with this-client/all filters and a per-account unread dot. Opening or dismissing history never reloads a page, installs software, or clears a draft. The desktop native update controls and Web Host-change refresh prompt remain DSH-owned.
+
+`product-updates.ts` declares the QZOS business-client version (independent of the upstream DSH runtime/package version). Release preparation must update it together with the authored catalog's component version when this business client changes. Browser requests declare their carrier and version through public `qzos_surface` / `qzos_version` query parameters so historical CORS allowlists remain usable; the installed Server policy decides compatibility. Missing historical metadata is shown as unknown; refresh failures retain installed history. The private Host may inject `__QZOS_BUSINESS_API__` for an isolated local API; managed deployments always use their authenticated gateway.
+
 ## Model Experience
 
 ### Business actions

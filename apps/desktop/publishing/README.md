@@ -12,6 +12,7 @@ Publish completed Desktop installers and update feeds to the selected download s
 
 ## Table of Contents
 
+- [Self-hosted unsigned Windows updates](#qzos-self-hosted)
 - [Publication prerequisites](#prerequisites)
 - [Deployment and test release identity](#upload-updates)
 - [Publish installers and update feeds](#publish-feeds)
@@ -20,6 +21,20 @@ Publish completed Desktop installers and update feeds to the selected download s
 - [Upload audit and recovery](#audit-and-recovery)
 
 For retained self-hosted builds, use the [CI publication workflow](ci/README.md), which keeps installers on their original machine and supports resumable publication. The commands below remain the existing manually authorized local uploader: they retain checkout-local audit records and use the operator's Git identity. They do not share the CI publisher's locks, approval or tag-only recovery. Do not run both writers against one channel concurrently. Both use the same upload-plan validation; separate orchestration preserves existing manual commands while adding immutable-attempt recovery for CI. Consolidating or retiring the manual commands is separate work.
+
+<a id="qzos-self-hosted"></a>
+
+## Self-hosted unsigned Windows updates
+
+The QZOS Windows route uses the explicit [unsigned update configuration](../packaging/README.md#unsigned-windows-test-installer). It does not require COS, a code-signing certificate or USB token. After a complete package build, run from the matching source checkout:
+
+```sh
+pnpm exec tsx apps/desktop/scripts/export-windows-update.ts --output C:/qzos-staged/update-1
+```
+
+The output directory must be new and absolute; its parent must exist. The command reads the same public preset or ignored `.env.windows`, without signing secrets. For a downloaded CI artifact, add `--artifacts C:/qzos-artifacts/candidate`; the retained directory must include the EXE, blockmap, channel YAML and `win-x64-release.json`. The build record must declare `unsigned`, the QZOS app ID, the same native version, deployment, channel and exact feed destination. Missing or mismatched records, wrong size and wrong SHA-512 fail before staging. Signed artifacts cannot enter this route. CI retains those files when the explicit unsigned-update setting is enabled; the existing signed COS publication workflow remains a separate route.
+
+Export validates the source and copied bytes, rewrites feed URLs to the configured HTTPS origin, and emits the `qzos-desktop/unsigned/...` tree plus `qzos-update-stage.json`. This is a local inventory, not publisher authentication or publication. It does not connect to the server, upload files, modify a channel or create a release tag. Actual domain, server directory and transfer method belong to the operator. After separate publication authorization, transfer versioned EXE/blockmap files first, verify them against the inventory, then atomically replace the channel YAML last. Keep the previous channel and binaries for recovery; do not auto-downgrade installed clients. Serve the tree at the configured origin without changing its paths, enable normal binary/range downloads, and prevent stale caching of channel YAML. The mandatory-update policy service follows its existing API; a static download directory does not implement it.
 
 <a id="prerequisites"></a>
 

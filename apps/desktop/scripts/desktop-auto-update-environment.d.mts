@@ -98,3 +98,6 @@ export function resolveDesktopUploadConfig(
  * @returns Validated channel.
  */
 export function resolveDesktopUpdateChannel(env: NodeJS.ProcessEnv): 'nightly' | 'latest'
+
+/** Whether this is the explicit unsigned Windows HTTPS update route. */
+export function windowsUnsignedUpdates(env: NodeJS.ProcessEnv, platform: NodeJS.Platform): boolean

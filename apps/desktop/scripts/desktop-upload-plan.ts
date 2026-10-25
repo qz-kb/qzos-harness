@@ -10,8 +10,11 @@ import {
   desktopBuildRecordFilename,
   desktopUpdateMetadataFilename,
   resolveDesktopUploadConfig,
+  resolveDesktopAutoUpdateConfig,
+  windowsUnsignedUpdates,
 } from './desktop-auto-update-environment.mjs'
 import { desktopTargetBuildPaths } from './desktop-build-paths.mjs'
+import { resolveDesktopAppId } from './desktop-release-environment.mjs'
 import { validateDesktopBuildVersion } from './desktop-build-version.mjs'
 
 const APP_ROOT = resolve(import.meta.dirname, '..')
@@ -177,10 +180,10 @@ function uploadArtifact(
  * @param options - Optional filesystem roots and environment for tests or release automation.
  * @returns A fixed installer upload or an update plan with channel metadata ordered last.
  */
-export async function createDesktopUploadPlan(
+export async function createDesktopArtifactPlan(
   targetName: DesktopPackageTargetName,
   options: DesktopUploadPlanOptions = {},
-): Promise<DesktopUploadPlan> {
+): Promise<Omit<DesktopUploadPlan, 'bucket' | 'secretIdEnvName' | 'secretKeyEnvName'>> {
   const target = TARGETS[targetName]
   if (target === undefined) {
     throw new Error(`desktop upload: unsupported target ${String(targetName)}`)
@@ -188,18 +191,25 @@ export async function createDesktopUploadPlan(
   const environment = options.environment ?? process.env
   const repositoryRoot = options.repositoryRoot ?? REPOSITORY_ROOT
   const appRoot = options.appRoot ?? APP_ROOT
-  const artifactsRoot = options.artifactsRoot ?? desktopTargetBuildPaths(targetName).artifacts
+  const unsignedUpdates = windowsUnsignedUpdates(environment, target.platform)
+  const paths = desktopTargetBuildPaths(targetName)
+  const artifactsRoot = options.artifactsRoot ?? (unsignedUpdates ? paths.unsignedArtifacts : paths.artifacts)
   const dshVersion = options.packagedProductVersion ?? await manifestVersion(join(repositoryRoot, 'package.json'), 'dsh package')
   const desktopVersion = options.packagedProductVersion ?? await manifestVersion(join(appRoot, 'package.json'), 'desktop package')
   if (dshVersion !== desktopVersion) {
     throw new Error(`desktop upload: desktop version ${desktopVersion} does not match current dsh version ${dshVersion}`)
   }
 
-  const update = resolveDesktopUploadConfig(environment, target.platform, target.arch)
+  const update = resolveDesktopAutoUpdateConfig(environment, target.platform, target.arch)
   const buildRecord = await jsonFile(
     join(artifactsRoot, desktopBuildRecordFilename(targetName)),
     `${targetName} package completion record`,
   )
+  const signing = buildRecord.signing ?? 'signed'
+  if (signing !== (unsignedUpdates ? 'unsigned' : 'signed')
+    || ((unsignedUpdates || buildRecord.appId !== undefined) && buildRecord.appId !== resolveDesktopAppId(environment))) {
+    throw new Error('desktop upload: package signing mode or application identity does not match the destination')
+  }
   // Packaging wrote the version it published; reading it back keeps release settings out of shell variables.
   const recordedVersion = stringField(buildRecord.version, `${targetName} package completion record.version`)
   let buildVersion: string
@@ -237,7 +247,7 @@ export async function createDesktopUploadPlan(
     throw new Error(`desktop upload: ${metadataFilename}.files must contain exactly one target update file`)
   }
 
-  const base = `deepseek-harness-${buildVersion}-${target.os}-${target.arch}`
+  const base = `deepseek-harness-${buildVersion}-${target.os}-${target.arch}${unsignedUpdates ? '-unsigned' : ''}`
   const updaterExtension = target.platform === 'darwin' ? 'zip' : 'exe'
   const updaterInfo = updateFileInfo(metadata.files[0], `${metadataFilename}.files[0]`, `${base}.${updaterExtension}`)
   const updaterPath = await verifyChecksummedArtifact(artifactsRoot, updaterInfo)
@@ -284,11 +294,26 @@ export async function createDesktopUploadPlan(
     target: targetName,
     version: buildVersion,
     publicUrl: options.latest ? `${update.origin}/${latestKey}` : update.publicUrl,
-    bucket: update.bucket,
-    secretIdEnvName: update.secretIdEnvName,
-    secretKeyEnvName: update.secretKeyEnvName,
     artifacts: options.latest ? [{ ...installerArtifact, filename: latestFilename, key: latestKey }] : artifacts,
     ...typeof buildRecord.commit === 'string' ? { commit: buildRecord.commit } : {},
     ...typeof buildRecord.dirty === 'boolean' ? { dirty: buildRecord.dirty } : {},
   }
+}
+
+/** Validate artifacts and add the credentials' names for the optional COS transport.
+ * @param targetName Desktop target.
+ * @param options Local artifacts and configuration.
+ * @returns Validated COS upload plan; no upload is performed.
+ */
+export async function createDesktopUploadPlan(
+  targetName: DesktopPackageTargetName, options: DesktopUploadPlanOptions = {},
+): Promise<DesktopUploadPlan> {
+  const target = TARGETS[targetName]
+  if (!target) throw new Error('desktop upload: unsupported target')
+  if (windowsUnsignedUpdates(options.environment ?? process.env, target.platform)) {
+    throw new Error('desktop upload: unsigned Windows updates use the self-hosted export route')
+  }
+  const update = resolveDesktopUploadConfig(options.environment ?? process.env, target.platform, target.arch)
+  return { ...await createDesktopArtifactPlan(targetName, options), bucket: update.bucket,
+    secretIdEnvName: update.secretIdEnvName, secretKeyEnvName: update.secretKeyEnvName }
 }

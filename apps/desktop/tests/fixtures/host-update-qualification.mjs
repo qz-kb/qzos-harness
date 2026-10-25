@@ -164,7 +164,7 @@ try {
     }
 
     ctx.effect(() => ctx.jobs.attachController('update-qualification'))
-    for (const owner of [undefined, agent]) {
+    for (const owner of [undefined, agent.id]) {
       let child
       let done
       const id = ctx.jobs.start({ kind: 'update-qualification', label: 'Private Node process waiting for stdin EOF', owner,

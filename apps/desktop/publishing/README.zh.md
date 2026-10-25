@@ -12,6 +12,7 @@ description: "将完整 Desktop 安装包与更新清单发布到选定下载服
 
 ## 目录
 
+- [自有服务器托管 Windows 未签名更新](#qzos-self-hosted)
 - [发布前提](#prerequisites)
 - [部署环境与测试发布标识](#upload-updates)
 - [发布安装包与更新清单](#publish-feeds)
@@ -20,6 +21,20 @@ description: "将完整 Desktop 安装包与更新清单发布到选定下载服
 - [上传审计与恢复](#audit-and-recovery)
 
 自托管留存构建使用 [CI 发布工作流](ci/README.zh.md)，在原机器保留安装包并支持恢复发布。 以下命令继续作为现有人工授权的本地上传器使用：它们保留 checkout 内的审计记录，并使用操作员的 Git 身份，不共享 CI 发布器的锁、审批或仅补 tag 恢复机制。不要让两种上传器并发写入同一频道。两者复用相同的上传计划校验；分开编排可保留现有手动命令，同时为 CI 增加不可变 attempt 恢复能力。统一或退役手动命令属于独立工作。
+
+<a id="qzos-self-hosted"></a>
+
+## 自有服务器托管 Windows 未签名更新
+
+QZOS Windows 路线使用明确的[未签名更新配置](../packaging/README.zh.md#unsigned-windows-test-installer)，不要求 COS、代码签名证书或 USB Token。完整打包成功后，在对应源码 checkout 中执行：
+
+```sh
+pnpm exec tsx apps/desktop/scripts/export-windows-update.ts --output C:/qzos-staged/update-1
+```
+
+输出目录必须是新的绝对路径，父目录须已存在。命令读取相同公共 preset 或已忽略的 `.env.windows`，不读取签名秘密。使用下载的 CI 产物时增加 `--artifacts C:/qzos-artifacts/candidate`；保留目录须含 EXE、blockmap、频道 YAML 和 `win-x64-release.json`。构建记录必须明确为 `unsigned`，包含 QZOS 应用 ID，并匹配原生版本、部署、频道和精确更新源。记录缺失或不匹配、大小或 SHA-512 不符都会在生成目录前失败；签名产物不能进入此路线。明确启用未签名更新时，CI 会保留这些文件；既有签名 COS 发布工作流仍是独立路线。
+
+导出过程校验源文件和复制后的字节，把清单 URL 改写为配置的 HTTPS origin，生成 `qzos-desktop/unsigned/...` 目录及 `qzos-update-stage.json`。后者是本地文件清单，不是发布者认证或发布证明。命令不会连接服务器、上传文件、修改频道或创建发布 Tag。实际域名、服务器目录和传输方式由运维配置。另获发布授权后，先传版本化 EXE／blockmap，按文件清单复核，再最后原子替换频道 YAML；保留上一份频道和二进制供恢复，不自动降级已安装客户端。按配置 origin 提供原目录结构，支持正常二进制／Range 下载，避免频道 YAML 被长期缓存。强制更新策略服务继续遵循已有 API，静态下载目录不能替代该服务。
 
 <a id="prerequisites"></a>
 

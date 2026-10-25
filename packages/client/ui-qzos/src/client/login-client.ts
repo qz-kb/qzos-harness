@@ -1,5 +1,7 @@
+import { qzosVersionedUrl } from './product-updates.ts'
 /** QZOS business authentication; independent from DSH browser/Host credentials. */
 declare global {
+  var __QZOS_BUSINESS_API__: string | undefined
   var __QZOS_MANAGED_ACCOUNT__: string | undefined
   var __QZOS_PUBLIC_VISITOR_ORIGIN__: string | undefined
 }
@@ -8,7 +10,7 @@ export const managedAccount = globalThis.__QZOS_MANAGED_ACCOUNT__
 /** Same-origin cookies are used only by the enterprise gateway. */
 export const loginCredentials: RequestCredentials = managedAccount ? 'same-origin' : 'omit'
 /** Business API selected by the private Host composition. */
-export const loginApi = managedAccount ? new URL('_qzos/business', document.baseURI).href : 'http://127.0.0.1:3082/api'
+export const loginApi = managedAccount ? new URL('_qzos/business', document.baseURI).href : globalThis.__QZOS_BUSINESS_API__ ?? 'http://127.0.0.1:3082/api'
 /** Public visitor origin configured independently from the authenticated proxy. */
 export const publicVisitorApi = globalThis.__QZOS_PUBLIC_VISITOR_ORIGIN__ ?? (managedAccount ? '' : loginApi)
 /** Storage key for the API-scoped business credential. */
@@ -35,7 +37,7 @@ export class LoginError extends Error {
  * @returns Validated response or mapped presentation value.
  */
 export async function loginRequest(path: string, body?: LoginRecord, token?: string, signal?: AbortSignal): Promise<LoginRecord> {
-  const response = await fetch(`${loginApi}${path}`, {
+  const response = await fetch(qzosVersionedUrl(`${loginApi}${path}`), {
     method: body ? 'POST' : 'GET', credentials: loginCredentials, redirect: 'error', cache: 'no-store',
     headers: { 'Content-Type': 'application/json', terminal: '4', version: '4.8.0', ...token ? { token } : {} },
     ...body ? { body: JSON.stringify(body) } : {},

@@ -65,6 +65,7 @@ export function resolveDesktopAppId(env) {
   if (!/^[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/u.test(appId)) {
     throw new Error(`desktop release environment: ${DESKTOP_APP_ID_ENV} must be a reverse-DNS identifier`)
   }
+  if (appId === 'com.deepseek.harness' || appId.startsWith('com.deepseek.')) throw new Error('QZOS requires a product-owned application identifier')
   return appId
 }
 

@@ -25,8 +25,8 @@ const UPDATE_ENVIRONMENTS = {
     secretKeyEnvName: 'DOWNLOAD_TEST_COS_SECRET_KEY',
   },
   production: {
-    originEnvName: undefined,
-    fixedOrigin: 'https://download.deepseek.com',
+    originEnvName: 'DOWNLOAD_PROD_ORIGIN',
+    fixedOrigin: undefined,
     bucketEnvName: 'DOWNLOAD_PROD_COS_BUCKET',
     secretIdEnvName: 'DOWNLOAD_PROD_COS_SECRET_ID',
     secretKeyEnvName: 'DOWNLOAD_PROD_COS_SECRET_KEY',
@@ -151,7 +151,9 @@ export function resolveDesktopAutoUpdateConfig(env, platform, arch) {
     if (originEnvName === undefined) throw new Error('desktop auto-update: selected deployment has no origin')
     origin = httpsOrigin(requiredEnvironmentValue(env, originEnvName), originEnvName)
   }
-  let releasePrefix = 'dsh-desk'
+  if (new URL(origin).hostname === 'deepseek.com' || new URL(origin).hostname.endsWith('.deepseek.com')) throw new Error('QZOS builds require a product-owned update origin')
+  let releasePrefix = 'qzos-desktop'
+  if (windowsUnsignedUpdates(env, platform)) releasePrefix += '/unsigned'
   if (environment === 'test') {
     const releaseId = requiredEnvironmentValue(env, 'DOWNLOAD_TEST_RELEASE_ID')
     if (!/^[a-f0-9]{32}$/u.test(releaseId)) {
@@ -188,4 +190,20 @@ export function resolveDesktopUploadConfig(env, platform, arch) {
     secretIdEnvName: deployment.secretIdEnvName,
     secretKeyEnvName: deployment.secretKeyEnvName,
   }
+}
+
+/**
+ * Select the explicit Windows unsigned HTTPS update route; signed and macOS routes keep signature checks.
+ * @param {NodeJS.ProcessEnv} env File-owned settings and selected packaging mode.
+ * @param {NodeJS.Platform} platform Target platform.
+ * @returns {boolean} Whether unsigned Windows updates are enabled.
+ */
+export function windowsUnsignedUpdates(env, platform) {
+  const value = env.DSH_DESKTOP_WINDOWS_UNSIGNED_UPDATES
+  if (value !== undefined && value !== '0' && value !== '1') throw new Error('DSH_DESKTOP_WINDOWS_UNSIGNED_UPDATES must be 0 or 1')
+  if (value !== '1') return false
+  if (platform !== 'win32' || env.DSH_DESKTOP_UNSIGNED !== '1') {
+    throw new Error('Unsigned updates require an explicitly unsigned Windows package')
+  }
+  return true
 }
