@@ -140,9 +140,10 @@ export function createElectronBuilderConfig(
       return true
     },
     files: [
-      ...(testReleaseId === undefined ? [] : ['windows-test-bootstrap.mjs', 'installed-update-identity.mjs'].map(name => ({
-        from: fileURLToPath(new URL(name, import.meta.url)), to: name,
-      }))),
+      ...(testReleaseId === undefined ? [] : [{
+        from: fileURLToPath(new URL('.', import.meta.url)), to: '.',
+        filter: ['windows-test-bootstrap.mjs', 'installed-update-identity.mjs'],
+      }]),
       'lib/main.js',
       'lib/welcome/**/*',
       'lib/preload-app.cjs',

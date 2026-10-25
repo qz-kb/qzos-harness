@@ -1,7 +1,11 @@
 import { createHash } from 'node:crypto'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { Packager } from 'app-builder-lib'
+import { FileMatcher } from 'app-builder-lib/out/fileMatcher.js'
+import { computeFileSets, getDestinationPath } from 'app-builder-lib/out/util/appFileCopier.js'
 import { afterEach, expect, it } from 'vitest'
 import { createElectronBuilderConfig } from '../scripts/electron-builder-config.mjs'
 import { windowsUnsignedUpdates } from '../scripts/desktop-auto-update-environment.mjs'
@@ -50,6 +54,24 @@ it('keeps production launches out of the test-data bootstrap', () => {
   expect(config.extraMetadata.name).toBeUndefined()
   expect(config.extraMetadata.qzosDesktopTestReleaseId).toBeUndefined()
   expect(config.protocols).toEqual([{ name: 'DeepSeek Harness', schemes: ['dsh'] }])
+})
+
+it('collects both bootstrap files at the archive root with the actual builder file walker', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'qzos-bootstrap-files-')); roots.push(root)
+  const config = createElectronBuilderConfig(env, 'win32', 'x64')
+  const scripts = fileURLToPath(new URL('../scripts/', import.meta.url))
+  const packager = new Packager({ projectDir: root })
+  const destinations: string[] = []
+  for (const mapping of config.files) {
+    if (typeof mapping === 'string' || !mapping.from.startsWith(scripts)) continue
+    const matcher = new FileMatcher(mapping.from, join(root, mapping.to), value => value, mapping.filter && [...mapping.filter])
+    // File collection only reads the owning Packager; no signing or target construction occurs.
+    const target = { info: packager } as Parameters<typeof computeFileSets>[2]
+    for (const set of await computeFileSets([matcher], null, target, false)) {
+      for (const file of set.files) destinations.push(relative(root, getDestinationPath(file, set)))
+    }
+  }
+  expect(destinations.sort()).toEqual(['installed-update-identity.mjs', 'windows-test-bootstrap.mjs'])
 })
 
 async function fixture() {

@@ -4,12 +4,12 @@ import type { AfterPackContext, BeforePackContext } from 'app-builder-lib'
 export interface DesktopElectronBuilderConfig {
   readonly appId: string
   readonly artifactName: string
-  readonly protocols: readonly [{ readonly name: 'DeepSeek Harness'; readonly schemes: readonly ['dsh'] }]
+  readonly protocols: readonly [{ readonly name: string; readonly schemes: readonly [string] }]
   readonly directories: {
     readonly output: string
   }
   readonly files: readonly [
-    ...string[],
+    ...(string | { readonly from: string, readonly to: string, readonly filter: readonly string[] })[],
     { readonly from: string, readonly to: 'dsh', readonly filter: readonly ['**/*'] },
     { readonly from: string, readonly to: 'dsh/node_modules', readonly filter: readonly ['**/*'] },
   ]
