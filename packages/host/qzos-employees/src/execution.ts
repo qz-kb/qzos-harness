@@ -90,12 +90,7 @@ export async function execution(
         if (item.registration) {
           // The provider was never entered. Replay admission with the same identity,
           // then close it with exact zero usage; do not create an empty answer.
-          try { await signed(auth, 'begin', item.registration, lifetime.signal) }
-          catch (error) {
-            if (!(error instanceof ReceiptRefused)) throw error
-            await receipts.delete(key)
-            continue
-          }
+          await signed(auth, 'begin', item.registration, lifetime.signal)
           await signed(auth, 'complete', { call_id: item.callId, reply: '', usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } }, lifetime.signal)
           await receipts.delete(key)
           continue
@@ -153,6 +148,12 @@ export async function execution(
   ctx.on('agent/turn-stopping', async ({ agent }) => { const auth = credential(); if (auth && binding(agent.session.id)?.userId === auth.userId) await drain(auth) })
   return {
     attach, recover: drain,
+    async retrieve(auth: Credential, session: SessionId, employeeId: string, turn: number, question: string, signal: AbortSignal) {
+      await drain(auth)
+      const hash = createHash('sha256').update(JSON.stringify([auth.userId, session, employeeId, turn, question])).digest('hex')
+      const callId = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20, 32)}`
+      return signed(auth, 'retrieve', { call_id: callId, robot_id: Number(employeeId), session_id: session, turn_id: String(turn), question }, signal)
+    },
     async prepare(session: SessionId, value: z.infer<typeof metadata>) {
       const previous = turns.get(session)
       // Tool continuation carries no new user message; retain the turn's original evidence.

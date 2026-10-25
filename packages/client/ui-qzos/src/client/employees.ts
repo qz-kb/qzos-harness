@@ -6,10 +6,10 @@ import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { catalogs, type Example } from './catalog.ts'
-import { knowledgePages } from './knowledge-client.ts'
+import { knowledgePages, knowledgeRequest } from './knowledge-client.ts'
 import { employeeCard } from './employee-client.ts'
 import { employeeHost } from './employee-host.ts'
-import { storedLogin } from './login-client.ts'
+import { storedLogin, loginRecord } from './login-client.ts'
 import type { QzosKey } from './locales.ts'
 
 declare module '@deepseek-ai/dsh-api-session-controller/client' {
@@ -120,7 +120,12 @@ export function installEmployeeMentions(ctx: Context, t: Translate): ((id: strin
   const open = async (id: string, _title?: string): Promise<string | undefined> => {
     const token = storedLogin(sessionStorage)
     if (!token) return t('unavailable')
-    try { employees = (await knowledgePages('/kb.robot/lists', lifetime.signal)).map(employeeCard) } catch (error) { return error instanceof Error ? error.message : t('employeeOpenFailed') }
+    try {
+      const detail = loginRecord(await knowledgeRequest(`/kb.robot/detail?id=${encodeURIComponent(id)}`, undefined, lifetime.signal, token))
+      if (detail.work_state === 'paused' || detail.work_state === 'retired' || detail.knowledge_rebind_required || Number(detail.flow_status) === 1) return t('unavailable')
+      const selected = employeeCard(detail)
+      employees = [...employees.filter(item => item.id !== id), selected]
+    } catch (error) { return error instanceof Error ? error.message : t('employeeOpenFailed') }
     const reference = referenceFor(id)
     if (!reference) return t('unavailable')
     try {

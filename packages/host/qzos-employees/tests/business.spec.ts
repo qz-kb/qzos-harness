@@ -1,7 +1,7 @@
 /** Opening context uses business authorization and leaves task execution to native DSH. */
 import { afterEach, expect, it, vi } from 'vitest'
-import { context as retrieve } from '../src/business.ts'
-const employeeContext = (id: string, question: string, signal: AbortSignal) => retrieve({ apiUrl:'http://qzos.invalid/api',requestTimeoutMs:1000 }, 'synthetic-business-token', id, question, signal)
+import { context as retrieve, request } from '../src/business.ts'
+const employeeContext = (id: string, question: string, signal: AbortSignal) => retrieve({ apiUrl:'http://qzos.invalid/api',requestTimeoutMs:1000 }, 'synthetic-business-token', id, question, signal, () => request({ apiUrl: 'http://qzos.invalid/api', requestTimeoutMs: 1000 }, 'synthetic-business-token', '/kb.dsh/retrieve', signal, { robot_id: Number(id), question }))
 const loginApi = ''; const loginSessionKey = 'test'
 
 const employee = { id: 7, name: 'Researcher', is_enable: 1, work_state: 'ready', roles_prompt: 'Summarize sources.', kb_ids: [12], search_mode: 'similar', search_tokens: 1000, search_similar: 0.4, flow_config: { api_token: 'must-not-leak' } }
@@ -16,14 +16,14 @@ function setup() {
 afterEach(() => { vi.unstubAllGlobals() })
 it('serializes only role and authorized excerpts, not credentials or backend execution config', async () => {
   const { fetcher, signal } = setup()
-  fetcher.mockResolvedValueOnce(reply(employee)).mockResolvedValueOnce(reply([{ question: 'Source', answer: 'Evidence' }]))
+  fetcher.mockResolvedValueOnce(reply(employee)).mockResolvedValueOnce(reply([{ kb_id: 12, question: 'Source', answer: 'Evidence' }]))
   const context = await employeeContext('7', 'Summarize', signal)
   expect(context).toContain('Evidence')
   expect(context).not.toContain('must-not-leak')
   expect(context).not.toContain('synthetic-business-token')
   const body = fetcher.mock.calls[1]?.[1]?.body
   if (typeof body !== 'string') throw new Error('Missing request body')
-  expect(JSON.parse(body)).toMatchObject({ kb_id: 12, question: 'Summarize', search_mode: 'similar' })
+  expect(JSON.parse(body)).toMatchObject({ robot_id: 7, question: 'Summarize' })
 })
 it.each([
   { is_enable: 0 }, { work_state: 'paused' }, { work_state: 'retired' },
@@ -48,7 +48,7 @@ it('does not retrieve for an employee without knowledge', async () => {
 
 it('keeps verified file/version/coordinates in each fresh turn while excluding private source fields', async () => {
   const { fetcher, signal } = setup()
-  const hit = { question: 'Policy', answer: '19', fd_id: 8, version: 1, uuid: 'chunk-v1', file: { id: 8, name: 'Policy.pdf', path: '/private/original' }, parse_location: { page: 2, paragraph: null, source_refs: [{ page: 2, internal_path: '/secret' }], method: 'manual', object_id: 'secret-object' } }
+  const hit = { kb_id: 12, question: 'Policy', answer: '19', fd_id: 8, version: 1, uuid: 'chunk-v1', file: { id: 8, name: 'Policy.pdf', path: '/private/original' }, parse_location: { page: 2, paragraph: null, source_refs: [{ page: 2, internal_path: '/secret' }], method: 'manual', object_id: 'secret-object' } }
   fetcher.mockResolvedValueOnce(reply(employee)).mockResolvedValueOnce(reply([hit]))
     .mockResolvedValueOnce(reply(employee)).mockResolvedValueOnce(reply([{ ...hit, answer: '23', version: 2, uuid: 'chunk-v2' }]))
   const first = await employeeContext('7', 'Policy?', signal)
@@ -67,12 +67,12 @@ it.each([
   { page: null, paragraph: 1, slide: 3, source_refs: [{ slide: 3 }] },
 ])('retains spreadsheet and slide coordinates with absent PDF page: %j', async (location) => {
   const { fetcher, signal } = setup()
-  fetcher.mockResolvedValueOnce(reply(employee)).mockResolvedValueOnce(reply([{ question: 'Source', answer: 'Evidence', parse_location: location }]))
+  fetcher.mockResolvedValueOnce(reply(employee)).mockResolvedValueOnce(reply([{ kb_id: 12, question: 'Source', answer: 'Evidence', parse_location: location }]))
   const result = await employeeContext('7', 'Source?', signal)
   expect(JSON.parse(result.slice(result.indexOf('\n') + 1))).toMatchObject({ sources: [{ excerpts: [{ parse_location: location }] }] })
 })
 
-it('forwards current rerank and query optimization settings without changing the answer model', async () => {
+it('delegates selection and billing to the server without supplying routing or per-library budgets', async () => {
   const { fetcher, signal } = setup()
   fetcher.mockResolvedValueOnce(reply({
     ...employee, model_id: 77, ranking_status: 1, ranking_score: 0.3, ranking_model: 8,
@@ -81,6 +81,18 @@ it('forwards current rerank and query optimization settings without changing the
   await employeeContext('7', 'Question', signal)
   const body = JSON.parse(fetcher.mock.calls[1]?.[1]?.body as string) as Record<string, unknown>
   expect(body).toMatchObject({
-    ranking_status: 1, ranking_score: 0.3, ranking_model: 8, optimize_ask: 1, optimize_m_id: 9, optimize_s_id: 10 })
+    robot_id: 7, question: 'Question' })
+  expect(body).not.toHaveProperty('search_tokens')
+  expect(body).not.toHaveProperty('kb_id')
   expect(body).not.toHaveProperty('model_id')
+})
+
+it('uses one admitted request for several libraries and preserves their source IDs', async () => {
+  const { fetcher, signal } = setup()
+  fetcher.mockResolvedValueOnce(reply({ ...employee, kb_ids: [12, 13] })).mockResolvedValueOnce(reply([
+    { kb_id: 13, question: 'Second library', answer: 'Selected by the global budget' },
+  ]))
+  expect(await employeeContext('7', 'Task', signal)).toContain('Selected by the global budget')
+  expect(fetcher).toHaveBeenCalledTimes(2)
+  expect(fetcher.mock.calls[1]?.[0]).toBe('http://qzos.invalid/api/kb.dsh/retrieve')
 })

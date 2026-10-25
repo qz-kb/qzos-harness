@@ -21,7 +21,7 @@ it('recovers an admitted begin with a lost response after restart without invoki
   const media = new MemoryMediaPool(), session = SessionId('begin-response-loss')
   const auth = { userId: '1', token: 'synthetic' }, registrations = new Map<string, string>()
   const completed: Record<string, unknown>[] = []
-  let offline = true, providerCalls = 0, begins = 0
+  let offline = true, refused = false, providerCalls = 0, begins = 0
   const contexts: Context[] = []
   vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
     if (url.includes('/kb.robot/detail')) return Response.json({ code: 1, data: { id: 7, is_enable: 1, kb_ids: [], work_state: 'ready' } })
@@ -33,6 +33,7 @@ it('recovers an admitted begin with a lost response after restart without invoki
       if (registrations.has(key)) expect(registrations.get(key)).toBe(bytes)
       registrations.set(key, bytes)
       if (offline) throw new Error('begin response lost')
+      if (refused) return Response.json({ code: 0, msg: 'paused', data: { error_code: 'DSH_EMPLOYEE_UNAVAILABLE' } })
     } else if (url.endsWith('/complete')) completed.push(body)
     else throw new Error('Recovery must not create an empty answer')
     return Response.json({ code: 1, data: {} })
@@ -50,9 +51,11 @@ it('recovers an admitted begin with a lost response after restart without invoki
     const provider = async function* (): AsyncIterable<StreamChunk> { providerCalls++; yield { type: 'text-delta', index: 0, text: 'must not run' } }
     await expect((async () => { for await (const _ of first.ctx.waterfall('llm/stream', { provider: 'selected', model: 'window', sessionId: session, messages: [] }, provider)) { /* consume */ } })()).rejects.toThrow('begin response lost')
     await first.ctx.fiber.dispose()
-    const second = await open(); offline = false
+    const second = await open(); offline = false; refused = true
+    await expect(second.bridge.recover(auth)).rejects.toThrow('paused')
+    refused = false
     await second.bridge.recover(auth); await second.bridge.recover(auth)
-    expect(begins).toBe(2); expect(registrations.size).toBe(1); expect(providerCalls).toBe(0)
+    expect(begins).toBe(3); expect(registrations.size).toBe(1); expect(providerCalls).toBe(0)
     expect(completed).toHaveLength(1)
     expect(completed[0]).toMatchObject({ reply: '', usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } })
   } finally { for (const ctx of contexts) await ctx.fiber.dispose(); vi.unstubAllGlobals() }

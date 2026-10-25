@@ -20,7 +20,7 @@ declare module '@deepseek-ai/dsh-llm' {
 
 /** Explicit local QZOS endpoint configuration. */
 export type Config = BusinessConfig & {
-  /** Opt-in trusted receipts and employee capability tools; false keeps retrieval-only behavior. */
+  /** Opt-in trusted receipts and employee capability tools; knowledge retrieval requires this trusted adapter. */
   execution?: false | {
     /** Environment-variable name holding the shared Host/server signing secret. */
     secretEnv: string
@@ -186,7 +186,10 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     if (decision.kind === 'reject') return decision
     const question = decision.messages.filter(message => message.source.kind === 'user')
       .flatMap(message => message.content.flatMap(part => part.type === 'text' ? [part.text] : [])).join('\n')
-    const details = question.trim() ? await contextDetails(config, credential.token, binding.employeeId, question, signal) : undefined
+    const details = question.trim() ? await contextDetails(
+      config, credential.token, binding.employeeId, question, signal,
+      adapter ? () => adapter.retrieve(credential, agent.session.id, binding.employeeId, turn, question, signal) : undefined,
+    ) : undefined
     const checked = !details ? await employee(config, credential.token, binding.employeeId, signal) : undefined
     const rawTemperature = details?.temperature ?? checked?.value.temperature
     const temperature = rawTemperature == null ? Number.NaN : Number(rawTemperature)

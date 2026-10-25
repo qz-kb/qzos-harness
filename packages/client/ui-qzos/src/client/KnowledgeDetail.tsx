@@ -158,7 +158,7 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
       }
       const preview = loginRecord(await knowledgeRequest('/kb.teach/importPreview', { kb_id: Number(item.id), method, object_id: objectId, segment_length: segmentLength }))
       const rows = knowledgeRows(preview.rows)
-      imports.current.set(file, { kb_id: Number(item.id), method, documents: [{ request_id: randomUUID(), name: file.name, path: '', object_id: objectId, data: rows.map(row => ({ q: row.q, a: row.a })) }] })
+      imports.current.set(file, { kb_id: Number(item.id), method, documents: [{ request_id: randomUUID(), preview_key: preview.preview_key, name: file.name, path: '', object_id: objectId, data: rows.map(row => ({ q: row.q, a: row.a, location: row.location })) }] })
       prepared.push(...rows)
     }
     setPreviews(prepared)
@@ -242,10 +242,10 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
           {knowledgeText(qa.status_msg)} {knowledgeText(qa.error)}
           {Number(qa.status) === 3 && <Button disabled={busy || !editable} onClick={() => { void perform(async () => { await knowledgeRequest('/kb.teach/qaRetry', { kb_id: Number(item.id), fd_id: Number(document?.id) }); refresh() }) }}>{r('retry')}</Button>}
         </p>)}
-        <div className={css.toolbar}><div className={css.inline}><Button variant="primary" disabled={busy || !editable} onClick={() =>{  show('fragment') }}>{r('entryData')}</Button><Button disabled={busy || !editable} onClick={exportRows}>{r('exportAll')}</Button><Button disabled={busy || !editable || selection.length === 0} onClick={() =>{  retry(selection) }}>{r('batchRetry')}</Button><Button disabled={busy || !editable || selection.length === 0} onClick={() =>{  setConfirmation({ key: fragmentsKey, ids: selection }) }}>{r('batchDelete')}</Button></div>
+        <div className={css.toolbar}><div className={css.inline}><Button variant="primary" disabled={busy || !editable} onClick={() =>{  show('fragment') }}>{r('entryData')}</Button><Button disabled={busy || !editable} onClick={exportRows}>{r('exportAll')}</Button><Button disabled={busy || selection.length === 0 || selection.some(id => fragments.find(row => row.id === id)?.can_retry !== '1')} onClick={() =>{  retry(selection) }}>{r('batchRetry')}</Button><Button disabled={busy || selection.length === 0 || selection.some(id => fragments.find(row => row.id === id)?.can_delete !== '1')} onClick={() =>{  setConfirmation({ key: fragmentsKey, ids: selection }) }}>{r('batchDelete')}</Button></div>
           <div className={css.inline}><Input value={query} aria-label={r('keyword')} placeholder={r('keyword')} onChange={(event) => { setQuery(event.target.value); setSearch(event.target.value) }} /><select value={status} onChange={(event) =>{  setStatus(event.target.value) }} aria-label={r('learningStatus')}>{(['all', 'waitingLearn', 'learning', 'failedLearn', 'learned'] as const).map(value => <option key={value} value={value}>{r(value)}</option>)}</select></div></div>
         <ResourceTable rows={filteredFragments} r={r} selection={selection} onSelection={setSelection} columns={[['question', 'documentContent'], ['answer', 'extraContent'], ['status', 'learningStatus'], ['consumed', 'consumed'], ['updatedAt', 'updatedAt']]} cell={(row, key) => key === 'status' ? r(row.status === 'learned' ? 'learned' : row.status === 'failedLearn' ? 'failedLearn' : row.status === 'learning' ? 'learning' : 'waitingLearn') : row[key] ?? '—'} actions={row => [
-          { label: 'correct', disabled: !owned, run: () =>{  show('fragment', row) } }, ...row.status === 'failedLearn' ? [{ label: 'retry' as const, disabled: !owned, run: () =>{  retry([row.id]) } }] : [], { label: 'delete', disabled: !owned, run: () =>{  setConfirmation({ key: fragmentsKey, ids: [row.id] }) } },
+          { label: 'correct', disabled: row.can_edit !== '1', run: () =>{  show('fragment', row) } }, ...row.status === 'failedLearn' ? [{ label: 'retry' as const, disabled: row.can_retry !== '1', run: () =>{  retry([row.id]) } }] : [], { label: 'delete', disabled: row.can_delete !== '1', run: () =>{  setConfirmation({ key: fragmentsKey, ids: [row.id] }) } },
         ]} />
       </>}
     </>}

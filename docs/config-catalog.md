@@ -2609,7 +2609,7 @@ export type Config = LocalConfig
 ```ts config-catalog
 /** Explicit local QZOS endpoint configuration. */
 export type Config = BusinessConfig & {
-  /** Opt-in trusted receipts and employee capability tools; false keeps retrieval-only behavior. */
+  /** Opt-in trusted receipts and employee capability tools; knowledge retrieval requires this trusted adapter. */
   execution?: false | {
     /** Environment-variable name holding the shared Host/server signing secret. */
     secretEnv: string

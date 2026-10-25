@@ -10,7 +10,7 @@ afterEach(() => { vi.unstubAllGlobals() })
 async function setup() {
   vi.stubGlobal('document', { baseURI: 'http://localhost/' })
   vi.stubGlobal('sessionStorage', { getItem: (key: string) => key === loginSessionKey ? JSON.stringify({ api: loginApi, token: 'synthetic' }) : null })
-  const fetcher = vi.fn<typeof fetch>().mockResolvedValue(reply({ lists: [{ id: 7, name: 'Researcher', is_enable: 1 }], count: 1 }))
+  const fetcher = vi.fn<typeof fetch>().mockResolvedValue(reply({ id: 7, name: 'Researcher', is_enable: 1 }))
   vi.stubGlobal('fetch', fetcher)
   const ctx = new Context()
   let source: InputTriggerSource | undefined
@@ -73,4 +73,16 @@ it('captures the submitted task before the native editor clears it and excludes 
   if (typeof body !== 'string') throw new Error('Missing body')
   expect(JSON.parse(body)).toMatchObject({ action: 'bind', employeeId: '7', sessionId: 'new-session' })
   await runtime.fiber.dispose()
+})
+
+it('opens an authorized shared employee without requiring it in the owned directory and rejects withdrawal', async () => {
+  const runtime = await setup()
+  try {
+    expect(await runtime.open('7')).toBeUndefined()
+    expect(runtime.fetcher.mock.calls[0]?.[0]).toContain('/kb.robot/detail?id=7')
+    runtime.fetcher.mockResolvedValueOnce(Response.json({ code: 0, msg: '员工已下架或分享已取消。' }))
+    expect(await runtime.open('7')).toBe('员工已下架或分享已取消。')
+    expect(runtime.create).toHaveBeenCalledTimes(1)
+    expect(runtime.insertReference).toHaveBeenCalledTimes(1)
+  } finally { await runtime.fiber.dispose() }
 })

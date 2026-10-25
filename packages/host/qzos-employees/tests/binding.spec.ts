@@ -12,6 +12,8 @@ import * as Employees from '../src/index.ts'
 
 it.each([undefined, '1'])('persists bindings and checks account changes with Host owner %s', async (ownerUserId) => {
   const ctx = new Context()
+  vi.stubEnv('QZOS_BINDING_TEST_KEY', 's'.repeat(32))
+  ctx.provide('tools', { register: vi.fn(() => () => {}) } as never)
   const nativeFetch = fetch
   let owner = '1'
   let paused = false
@@ -20,8 +22,8 @@ it.each([undefined, '1'])('persists bindings and checks account changes with Hos
   let searches = 0
   let kbIds = [12]
   let rebindRequired = false
-  const agentState: Pick<Agent, 'session' | 'status' | 'cancel'> = {
-    session: Session.create(SessionId('employee-test')), status: 'idle', cancel: vi.fn<Agent['cancel']>(),
+  const agentState: Pick<Agent, 'session' | 'status' | 'cancel' | 'ctx'> = {
+    ctx, session: Session.create(SessionId('employee-test')), status: 'idle', cancel: vi.fn<Agent['cancel']>(),
   }
   const agent = agentState as Agent
   ctx.provide('agents', { get: (id: string) => id === agent.session.id ? agent : undefined } as never)
@@ -38,7 +40,7 @@ it.each([undefined, '1'])('persists bindings and checks account changes with Hos
     let data: unknown
     if (path.endsWith('/user/info')) data = { id:owner }
     else if (path.endsWith('/kb.robot/detail')) data = { temperature, id:7,name:'Researcher',roles_prompt:'Role',kb_ids:kbIds,knowledge_rebind_required:rebindRequired,is_enable:1,work_state:paused?'paused':'ready' }
-    else { searches++; data=[{ question:'source',answer:`evidence-${searches}` }] }
+    else { searches++; data=[{ kb_id:kbIds[0], question:'source',answer:`evidence-${searches}` }] }
     return new Response(JSON.stringify({ code:1,data }))
   })
   try {
@@ -46,7 +48,7 @@ it.each([undefined, '1'])('persists bindings and checks account changes with Hos
     ctx.storage.backend.register('memory',new MemoryStorageBackend())
     ctx.provide('storageDomain',new DomainFacility(ctx,{ backend:'memory',routes:{} }))
     await ctx.plugin(WebServer,{ host:'127.0.0.1',port:0 })
-    const baseConfig = { apiUrl:'http://qzos.invalid/api',requestTimeoutMs:1000 }
+    const baseConfig = { apiUrl:'http://qzos.invalid/api',requestTimeoutMs:1000, execution: { secretEnv: 'QZOS_BINDING_TEST_KEY' } }
     const config = { ...baseConfig, ...(ownerUserId === undefined ? {} : { ownerUserId, managedGateway:true }) }
     let plugin = ctx.plugin(Employees,config); await plugin.await()
     const injected: import('@deepseek-ai/dsh-host-webserver').IndexInjection[] = []
@@ -118,5 +120,5 @@ it.each([undefined, '1'])('persists bindings and checks account changes with Hos
     plugin=ctx.plugin(Employees,config); await plugin.await()
     owner='1'
     expect((await call({ action:'authorize',token:'synthetic' })).status).toBe(200)
-  } finally { await ctx.fiber.dispose(); vi.unstubAllGlobals() }
+  } finally { await ctx.fiber.dispose(); vi.unstubAllGlobals(); vi.unstubAllEnvs() }
 })
