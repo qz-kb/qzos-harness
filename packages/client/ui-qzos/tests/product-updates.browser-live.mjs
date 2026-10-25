@@ -10,7 +10,7 @@ const user = JSON.parse(await readFile(resolve(dir, 'product-user.json'), 'utf8'
 const log = await readFile(resolve(dir, 'dsh.log'), 'utf8')
 const entry = log.match(/http:\/\/127\.0\.0\.1:24921\/\S+/)?.[0]
 assert.ok(entry, 'explicit isolated Host authentication entry required')
-const secrets = new Set([user.password])
+const secrets = new Set([user.password, new URL(entry).searchParams.get('token')].filter(Boolean))
 const browser = await chromium.launch({ headless: true, executablePath: process.env.BROWSER_EXECUTABLE })
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, locale: 'zh-CN' })
@@ -74,10 +74,19 @@ try {
   if (process.env.PRODUCT_HOST_UPGRADE === '1') {
     await page.setViewportSize({ width: 1440, height: 1000 })
     const marker = resolve(dir, 'host-upgrade-ready')
+    const before = await page.evaluate(() => globalThis.__DSH_BOOT__?.release)
+    console.log('Host before restart: ' + JSON.stringify(before))
     await writeFile(marker, 'ready\n', { mode: 0o600 })
     try {
       const notice = page.getByRole('dialog', { name: /^(Service version changed|服务版本变化)$/ })
-      await notice.waitFor({ timeout: 240000 })
+      try { await notice.waitFor({ timeout: 90000 }) }
+      catch (error) {
+        await page.screenshot({ path: resolve(dir, 'browser-live/product-host-wait.png') })
+        console.log('Host wait state: ' + JSON.stringify(await page.evaluate(() => ({
+          release: globalThis.__DSH_BOOT__?.release, dialogs: [...document.querySelectorAll('[role=dialog]')].map(e => e.textContent),
+        }))))
+        throw error
+      }
       assert.equal(await composer.innerText(), draft, 'Host update must wait for user confirmation')
       await page.screenshot({ path: resolve(dir, 'browser-live/product-host-update.png') })
       await notice.getByRole('button', { name: /^(Reload to load the new version|刷新以加载新版本)$/ }).click()
