@@ -15,7 +15,7 @@ import { ResourceTable } from './ResourceTable.tsx'
 import { resourceCopy, type ResourceText } from './resource-copy.ts'
 import css from './Resources.module.css'
 import { publicationArtwork } from './resource-artwork.ts'
-import { correctionStorageKey, employeeDraft, readCorrection, rememberCorrection, saveEmployee } from './employee-client.ts'
+import { correctionStorageKey, employeeCorrectionQuestion, employeeDraft, readCorrection, rememberCorrection, saveEmployee } from './employee-client.ts'
 import { knowledgeDraft, knowledgeRows, knowledgeText, knowledgeRequest } from './knowledge-client.ts'
 import { publicVisitorApi, loginRecord, storedLogin, type LoginRecord } from './login-client.ts'
 import type { QzosKey } from './locales.ts'
@@ -84,7 +84,7 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
   const keysResource = useResource<'qzos-knowledge'>(dialog?.kind === 'keys' && dialog.row ? `dsh-resource://qzos-knowledge/employee-keys?id=${dialog.row.id}&epoch=${epoch}&revision=${revision}` : '')
   const keys = keysResource.value ? knowledgeRows(keysResource.value.rows) : []
   const shares: PreviewRow[] = publicationResource.value ? knowledgeRows(publicationResource.value.rows).map(row => ({ ...knowledgeDraft(row), id: knowledgeText(row.id), name: knowledgeText(row.name), entryId: knowledgeText(row.apikey), key: '', password: row.has_password ? 'protected' : '', status: row.status === 'active' ? 'enabled' : 'disabled', lastUsed: knowledgeText(row.use_time), mode: '' })) : []
-  const dialogues: PreviewRow[] = recordResource.value ? knowledgeRows(recordResource.value.rows).map(row => ({ ...knowledgeDraft(row), id: knowledgeText(row.id), name: knowledgeText(row.ask), question: knowledgeText(row.ask), answer: knowledgeText(row.reply), questionTime: knowledgeText(row.create_time), reviewed: Number(row.is_feedback) === 1 ? '1' : '0' })) : []
+  const dialogues: PreviewRow[] = recordResource.value ? knowledgeRows(recordResource.value.rows).map(row => ({ ...knowledgeDraft(row), id: knowledgeText(row.id), name: knowledgeText(row.ask), question: knowledgeText(row.ask), correctionQuestion: employeeCorrectionQuestion(row, knowledgeText(original.name)), answer: knowledgeText(row.reply), questionTime: knowledgeText(row.create_time), reviewed: Number(row.is_feedback) === 1 ? '1' : '0' })) : []
   const bindings = emptyRows
   const perform = async (work: () => Promise<void>) => {
     if (pending.current) return
@@ -103,6 +103,7 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
     setIssuedKey(''); setSelectedKey(''); setCalls(null); setNotice('')
     const values = resourceDraft(row ? { ...row, feedback_type: 'correction', feedback_key: randomUUID(), correction_key: randomUUID(), password: '', quotaDaily: row.limit_today_chat ?? '0', quotaTotal: row.limit_total_chat ?? '0' } : {})
     if (kind === 'correct' && row) {
+      values.question = row.correctionQuestion ?? row.question ?? ''
       if (!businessUser) { setNotice(t('correctionRecoveryUnavailable')); return }
       try {
         const saved = readCorrection(sessionStorage, correctionStorageKey(businessUser, item.id, row.id))

@@ -1,6 +1,6 @@
 /** Configuration writes preserve hidden server state instead of replaying mock defaults. */
 import { afterEach, expect, it, vi } from 'vitest'
-import { employeeCard, employeeDraft, employeePayload, saveEmployee } from '../src/client/employee-client.ts'
+import { employeeCard, employeeCorrectionQuestion, employeeDraft, employeePayload, saveEmployee } from '../src/client/employee-client.ts'
 
 const original = {
   id: 7, name: 'Test employee', image: '/employee.png', intro: '', is_enable: 1, is_public: 0,
@@ -70,4 +70,21 @@ it('preserves backend rejection and does not attempt readback after failed savin
   fetcher.mockResolvedValue(new Response(JSON.stringify({ code: 0, msg: 'Selection denied' })))
   await expect(saveEmployee(invalid, { ...employeeDraft(invalid), knowledge_dependency_action: 'replace', kb_ids: '14' }, [], new AbortController().signal)).rejects.toThrow('Selection denied')
   expect(fetcher).toHaveBeenCalledTimes(1)
+})
+
+it('prefills the original source question for a legacy leading employee label without changing history', () => {
+  const record = { ask: '@Research team  What is the code?', quotes: [{ question: 'What is the code?' }] }
+  expect(employeeCorrectionQuestion(record, 'Research team')).toBe('What is the code?')
+  expect(record.ask).toBe('@Research team  What is the code?')
+})
+it.each([
+  { ask: 'What is the code?', quotes: [{ question: 'What is the code?' }] },
+  { ask: '@Another employee What is the code?', quotes: [{ question: 'What is the code?' }] },
+  { ask: '@Research teamExtra What is the code?', quotes: [{ question: 'What is the code?' }] },
+  { ask: '@Research team What is the code?', quotes: [] },
+  { ask: '@Research team What is the code?', quotes: [{ question: 'A different question' }] },
+  { ask: '@Research team What is the code?', quotes: [{ question: '@Research team What is the code?' }, { question: 'What is the code?' }] },
+  { ask: 'Ask @Research team about the code', quotes: [{ question: 'about the code' }] },
+])('keeps ordinary text or unsupported historical normalization: $ask', (record) => {
+  expect(employeeCorrectionQuestion(record, 'Research team')).toBe(record.ask)
 })
