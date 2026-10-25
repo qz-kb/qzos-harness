@@ -88,3 +88,5 @@ Public sharing requires the matching QZOS PC static application with visitor-ses
 Managed mode uses `publicVisitorOrigin` for the separate public visitor site; an absent origin refuses links that would point into the private gateway. Original and offline-package downloads use same-origin gateway cookies without credentials in URLs. Templates must be enabled role templates, preventing private form-skill access through template IDs. Creation rereads the employee name and model and never inherits knowledge permissions.
 
 QA and CSV previews retain a document request ID across submission retries. The server acknowledges completed replays without creating another file or learning task; conflicting input or an unfinished receipt remains an explicit error.
+
+Correction dialogs offer only owned libraries. A request ID stays stable when retrying unchanged content after a lost save response; editing content or the destination starts a new request. Server rechecks ownership and deduplicates accepted corrections through its existing durable import receipts.

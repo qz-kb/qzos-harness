@@ -1,4 +1,5 @@
 /** Trusted Host receipts for the selected work-window route; no model routing overrides. */
+import { setTimeout as delay } from 'node:timers/promises'
 import { createHash, createHmac, randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -26,7 +27,10 @@ const journal = metadata.extend({
   }).optional(),
 })
 const spec = defineDomain({ name: 'qzos_execution', version: 1, tables: { turns: domainTable(metadata), receipts: domainTable(journal) } })
-class ReceiptRefused extends Error {}
+class ReceiptRefused extends Error {
+  constructor(message: string | undefined, readonly code: string) { super(message) }
+}
+class RetrievalPending extends Error {}
 class ReceiptTransportError extends Error {}
 /** Immutable credential captured before one operation. */
 export interface Credential { userId: string; token: string }
@@ -83,7 +87,8 @@ export async function execution(
         'DSH_REQUEST_INVALID', 'DSH_CHAT_NOT_LICENSED', 'DSH_ACCOUNT_UNAVAILABLE', 'DSH_EMPLOYEE_UNAVAILABLE',
         'DSH_WINDOW_MODEL_UNMAPPED', 'DSH_QUOTA_INSUFFICIENT', 'DSH_REQUEST_CONFLICT',
       ]
-      if (refusal.success && rejected.includes(refusal.data.error_code)) throw new ReceiptRefused(result.msg)
+      if (refusal.success && rejected.includes(refusal.data.error_code)) throw new ReceiptRefused(result.msg, refusal.data.error_code)
+      if (action === 'retrieve' && refusal.success && refusal.data.error_code === 'DSH_RETRIEVAL_PENDING') throw new RetrievalPending(result.msg)
       throw new Error(result.msg ?? 'QZOS receipt unavailable')
     }
     if (!response.ok) throw new Error('QZOS receipt unavailable')
@@ -98,7 +103,16 @@ export async function execution(
         if (item.registration) {
           // The provider was never entered. Replay admission with the same identity,
           // then close it with exact zero usage; do not create an empty answer.
-          await signed(auth, 'begin', item.registration, lifetime.signal)
+          try { await signed(auth, 'begin', item.registration, lifetime.signal) }
+          catch (error) {
+            // These refusals occur only after the server has ruled out an existing admission.
+            if (!(error instanceof ReceiptRefused) || ![
+              'DSH_CHAT_NOT_LICENSED', 'DSH_ACCOUNT_UNAVAILABLE', 'DSH_EMPLOYEE_UNAVAILABLE',
+              'DSH_WINDOW_MODEL_UNMAPPED', 'DSH_QUOTA_INSUFFICIENT',
+            ].includes(error.code)) throw error
+            await receipts.delete(key)
+            continue
+          }
           await signed(auth, 'complete', { call_id: item.callId, reply: '', usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } }, lifetime.signal)
           await receipts.delete(key)
           continue
@@ -161,15 +175,21 @@ export async function execution(
       const hash = createHash('sha256').update(JSON.stringify([auth.userId, session, employeeId, turn, question])).digest('hex')
       const callId = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20, 32)}`
       const input = { call_id: callId, robot_id: Number(employeeId), session_id: session, turn_id: String(turn), question }
-      try { return await signed(auth, 'retrieve', input, signal) }
-      catch (error) {
-        if (!(error instanceof ReceiptTransportError)) throw error
-        signal.throwIfAborted(); lifetime.signal.throwIfAborted()
-        // One transport recovery only. Server rechecks access and owns durable provider deduplication.
-        try { return await signed(auth, 'retrieve', input, signal) }
-        catch (recoveryError) {
-          if (!(recoveryError instanceof ReceiptTransportError) || signal.aborted || lifetime.signal.aborted) throw recoveryError
-          throw new Error('知识检索连接中断，自动恢复未成功，请稍后重新提问；本次已发生的用量保留核对。')
+      const active = AbortSignal.any([signal, lifetime.signal])
+      let transportRecovered = false
+      for (;;) {
+        active.throwIfAborted()
+        try { return await signed(auth, 'retrieve', input, active) }
+        catch (error) {
+          active.throwIfAborted()
+          if (error instanceof RetrievalPending) {
+            // Keep the current turn and identity while the server's original request finishes.
+            await delay(Math.min(1000, config.requestTimeoutMs), undefined, { signal: active })
+            continue
+          }
+          if (!(error instanceof ReceiptTransportError)) throw error
+          if (transportRecovered) throw new Error('知识检索连接中断，自动恢复未成功，请稍后重新提问；本次已发生的用量保留核对。')
+          transportRecovered = true
         }
       }
     },

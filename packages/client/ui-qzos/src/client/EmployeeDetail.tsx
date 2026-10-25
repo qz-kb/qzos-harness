@@ -100,7 +100,7 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
   const update = (key: string, value: string) =>{  setDraft(current => ({ ...current, [key]: value })) }
   const show = (kind: EmployeeDialog['kind'], row?: PreviewRow, readOnly = false) => {
     setIssuedKey(''); setSelectedKey(''); setCalls(null)
-    setDialogDraft(resourceDraft(row ? { ...row, feedback_type: 'correction', feedback_key: randomUUID(), password: '', quotaDaily: row.limit_today_chat ?? '0', quotaTotal: row.limit_total_chat ?? '0' } : {}))
+    setDialogDraft(resourceDraft(row ? { ...row, feedback_type: 'correction', feedback_key: randomUUID(), correction_key: randomUUID(), password: '', quotaDaily: row.limit_today_chat ?? '0', quotaTotal: row.limit_total_chat ?? '0' } : {}))
     setDialog({ kind, readOnly, ...row ? { row } : {} })
   }
   const saveDialog = () => { void perform(async () => {
@@ -118,7 +118,7 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
     } else if (dialog.kind === 'feedback' && dialog.row) {
       await request('/v1/kb/feedback', { robot_id: Number(item.id), record_id: Number(dialog.row.id), type: dialogDraft.feedback_type, idempotency_key: dialogDraft.feedback_key, content: dialogDraft.feedback_type === 'correction' ? dialogDraft.feedback : '' })
     } else if (dialog.kind === 'correct' && dialogDraft.kb_id) {
-      await request('/kb.chat/chatCorrect', { kb_id: Number(dialogDraft.kb_id), ask: dialogDraft.question, reply: dialogDraft.answer, images: [], files: [], video: [] })
+      await request('/kb.chat/chatCorrect', { request_id: dialogDraft.correction_key, kb_id: Number(dialogDraft.kb_id), ask: dialogDraft.question, reply: dialogDraft.answer, images: [], files: [], video: [] })
     } else { unsupported(); return }
     setDialog(null); refresh(); setNotice(t('kbSaved'))
   }) }
@@ -218,8 +218,10 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
             : dialog?.kind === 'feedback' ? <><select aria-label={r('feedback')} value={dialogDraft.feedback_type} onChange={(event) => { setDialogDraft(current => ({ ...current, feedback_type: event.target.value, feedback_key: randomUUID() })) }}>{(['like', 'dislike', 'correction', 'miss'] as const).map(type => <option key={type} value={type}>{t(({ like: 'feedbackLike', dislike: 'feedbackDislike', correction: 'feedbackCorrection', miss: 'feedbackMiss' } as const)[type])}</option>)}</select>{dialogDraft.feedback_type === 'correction' && <label>{r('feedbackContent')}<textarea className={css.textArea} rows={5} value={dialogDraft.feedback ?? ''} onChange={(event) =>{  setDialogDraft(current => ({ ...current, feedback: event.target.value })) }} /></label>}</>
               : dialog?.kind === 'reply' ? <><strong>{dialog.row?.question}</strong><p>{dialog.row?.answer}</p></>
                 : dialog?.kind === 'api' ? <label>{r('name')}<Input value={dialogDraft.name ?? ''} onChange={(event) =>{  setDialogDraft(current => ({ ...current, name: event.target.value })) }} /></label>
-                  : <>{dialog?.kind === 'correct' && <select aria-label={r('knowledge')} value={dialogDraft.kb_id ?? ''} onChange={(event) => { setDialogDraft(current => ({ ...current, kb_id: event.target.value })) }}><option value="">—</option>{knowledge.map(kb => <option key={kb.id} value={kb.id}>{kb.title}</option>)}</select>}<ResourceFields t={t} form={form} draft={dialogDraft} knowledge={knowledge} disabled={dialog?.readOnly ?? false}
-                    onChange={(key, value) =>{  setDialogDraft(current => ({ ...current, [key]: value })) }} /></>}
+                  : <>{dialog?.kind === 'correct' && <><p>{t('correctionOwnedOnly')}</p><select aria-label={r('knowledge')} value={dialogDraft.kb_id ?? ''} onChange={(event) => { setDialogDraft(current => ({ ...current, kb_id: event.target.value, correction_key: randomUUID() })) }}><option value="">—</option>{knowledge.filter(kb => kb.scope === 'owned').map(kb => <option key={kb.id} value={kb.id}>{kb.title}</option>)}</select></>}<ResourceFields t={t} form={form} draft={dialogDraft} knowledge={knowledge} disabled={dialog?.readOnly ?? false}
+                    onChange={(key, value) => {
+                      setDialogDraft(current => ({ ...current, [key]: value, correction_key: randomUUID() }))
+                    }} /></>}
     </Modal>
     <Modal className={css.employeeDialog as string} open={confirmKnowledgeRemoval} onClose={() => { if (!busy) setConfirmKnowledgeRemoval(false) }} closeLabel={r('close')} title={t('employeeKnowledgeRemove')} description={t('employeeKnowledgeRemoveHint')}
       footer={<><Button disabled={busy} variant="outline" onClick={() => { setConfirmKnowledgeRemoval(false) }}>{r('cancel')}</Button><Button disabled={busy} variant="primary" onClick={saveConfiguration}>{r('confirm')}</Button></>}>

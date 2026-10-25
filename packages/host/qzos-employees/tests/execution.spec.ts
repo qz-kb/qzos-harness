@@ -21,7 +21,7 @@ it('recovers an admitted begin with a lost response after restart without invoki
   const media = new MemoryMediaPool(), session = SessionId('begin-response-loss')
   const auth = { userId: '1', token: 'synthetic' }, registrations = new Map<string, string>()
   const completed: Record<string, unknown>[] = []
-  let offline = true, refused = false, providerCalls = 0, begins = 0
+  let offline = true, providerCalls = 0, begins = 0
   const contexts: Context[] = []
   vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
     if (url.includes('/kb.robot/detail')) return Response.json({ code: 1, data: { id: 7, is_enable: 1, kb_ids: [], work_state: 'ready' } })
@@ -33,7 +33,6 @@ it('recovers an admitted begin with a lost response after restart without invoki
       if (registrations.has(key)) expect(registrations.get(key)).toBe(bytes)
       registrations.set(key, bytes)
       if (offline) throw new Error('begin response lost')
-      if (refused) return Response.json({ code: 0, msg: 'paused', data: { error_code: 'DSH_EMPLOYEE_UNAVAILABLE' } })
     } else if (url.endsWith('/complete')) completed.push(body)
     else throw new Error('Recovery must not create an empty answer')
     return Response.json({ code: 1, data: {} })
@@ -51,11 +50,9 @@ it('recovers an admitted begin with a lost response after restart without invoki
     const provider = async function* (): AsyncIterable<StreamChunk> { providerCalls++; yield { type: 'text-delta', index: 0, text: 'must not run' } }
     await expect((async () => { for await (const _ of first.ctx.waterfall('llm/stream', { provider: 'selected', model: 'window', sessionId: session, messages: [] }, provider)) { /* consume */ } })()).rejects.toThrow('begin response lost')
     await first.ctx.fiber.dispose()
-    const second = await open(); offline = false; refused = true
-    await expect(second.bridge.recover(auth)).rejects.toThrow('paused')
-    refused = false
+    const second = await open(); offline = false
     await second.bridge.recover(auth); await second.bridge.recover(auth)
-    expect(begins).toBe(3); expect(registrations.size).toBe(1); expect(providerCalls).toBe(0)
+    expect(begins).toBe(2); expect(registrations.size).toBe(1); expect(providerCalls).toBe(0)
     expect(completed).toHaveLength(1)
     expect(completed[0]).toMatchObject({ reply: '', usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } })
   } finally { for (const ctx of contexts) await ctx.fiber.dispose(); vi.unstubAllGlobals() }
@@ -150,5 +147,61 @@ it('recovers retrieval transport loss with the same identity, but never retries 
     const next = JSON.parse(bodies[0]!) as { turn_id: string }; expect(next.turn_id).toBe('2')
     bodies.length = 0; mode = 'cancel'
     await expect(retrieve()).rejects.toThrow(); expect(bodies).toHaveLength(1)
+  } finally { await ctx.fiber.dispose(); vi.unstubAllGlobals() }
+})
+
+it('clears only confirmed unadmitted registrations and leaves ambiguous recovery available', async () => {
+  const ctx = new Context(), auth = { userId: '1', token: 'synthetic' }, session = SessionId('unadmitted')
+  let mode = 'offline', providerCalls = 0, retrievals = 0
+  vi.stubGlobal('fetch', async (url: string) => {
+    if (url.includes('/kb.robot/detail')) return Response.json({ code: 1, data: { id: 7, is_enable: 1, kb_ids: [], work_state: 'ready' } })
+    if (url.endsWith('/retrieve')) { retrievals++; return Response.json({ code: 1, data: [] }) }
+    expect(url.endsWith('/begin')).toBe(true)
+    if (mode === 'offline') throw new Error('not admitted')
+    return Response.json({ code: 0, msg: mode, data: { error_code: mode } })
+  })
+  try {
+    await ctx.plugin(Storage); ctx.storage.backend.register('memory', new MemoryStorageBackend())
+    ctx.provide('storageDomain', new DomainFacility(ctx, { backend: 'memory', routes: {} }))
+    const bridge = await execution(ctx, { apiUrl: 'http://qzos.invalid/api', requestTimeoutMs: 1000 }, 's'.repeat(32), () => auth, () => ({ userId: '1', employeeId: '7' }))
+    await bridge.prepare(session, { userId: '1', employeeId: '7', turn: 1, question: 'question', sources: [] })
+    const provider = async function* (): AsyncIterable<StreamChunk> { providerCalls++; yield { type: 'text-delta', index: 0, text: 'must not run' } }
+    await expect((async () => { for await (const _ of ctx.waterfall('llm/stream', { provider: 'selected', model: 'window', sessionId: session, messages: [] }, provider)) { /* consume */ } })()).rejects.toThrow('not admitted')
+    for (const error of ['offline', 'DSH_REQUEST_CONFLICT', 'DSH_REQUEST_INVALID']) {
+      mode = error
+      await expect(bridge.recover(auth)).rejects.toThrow()
+    }
+    mode = 'DSH_EMPLOYEE_UNAVAILABLE'
+    await expect(bridge.retrieve(auth, session, '8', 2, 'other employee', new AbortController().signal)).resolves.toEqual([])
+    await bridge.recover(auth)
+    expect(providerCalls).toBe(0); expect(retrievals).toBe(1)
+  } finally { await ctx.fiber.dispose(); vi.unstubAllGlobals() }
+})
+
+it('continues pending retrieval in the same turn and cancels pending polling', async () => {
+  const ctx = new Context(), auth = { userId: '1', token: 'synthetic' }, bodies: string[] = []
+  let pending = true
+  vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
+    bodies.push(String(init?.body))
+    return Response.json(pending ? { code: 0, msg: 'pending', data: { error_code: 'DSH_RETRIEVAL_PENDING' } } : { code: 1, data: ['original result'] })
+  })
+  try {
+    await ctx.plugin(Storage); ctx.storage.backend.register('memory', new MemoryStorageBackend())
+    ctx.provide('storageDomain', new DomainFacility(ctx, { backend: 'memory', routes: {} }))
+    const bridge = await execution(ctx, { apiUrl: 'http://qzos.invalid/api', requestTimeoutMs: 10 }, 's'.repeat(32), () => auth, () => undefined)
+    const active = new AbortController()
+    const result = bridge.retrieve(auth, SessionId('pending'), '7', 1, 'question', active.signal)
+    await vi.waitFor(() => expect(bodies.length).toBeGreaterThan(1))
+    pending = false
+    await expect(result).resolves.toEqual(['original result'])
+    expect(new Set(bodies).size).toBe(1)
+    pending = true; bodies.length = 0
+    const cancelled = bridge.retrieve(auth, SessionId('pending'), '7', 2, 'question', active.signal)
+    const rejection = expect(cancelled).rejects.toThrow()
+    await vi.waitFor(() => expect(bodies.length).toBeGreaterThan(0))
+    active.abort(); await rejection
+    const count = bodies.length
+    await new Promise(resolve => setTimeout(resolve, 30))
+    expect(bodies.length).toBe(count)
   } finally { await ctx.fiber.dispose(); vi.unstubAllGlobals() }
 })
