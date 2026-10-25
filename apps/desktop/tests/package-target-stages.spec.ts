@@ -5,6 +5,7 @@ import { withMacOSNotarizationProxy } from '../scripts/macos-notarization-proxy.
 import { packageMacOSArtifacts } from '../scripts/package-macos.ts'
 import { withWindowsSigningStage } from '../scripts/windows-signing-stage.mjs'
 import { prepareWindowsSignatureCacheDirectory } from '../scripts/windows-signature-cache-directory.mjs'
+import { desktopTargetBuildPaths } from '../scripts/desktop-build-paths.mjs'
 
 vi.mock('../scripts/macos-notarization-proxy.ts', () => ({
   withMacOSNotarizationProxy: vi.fn(async (_proxy: string | undefined, action: () => Promise<void>) => action()),
@@ -76,6 +77,18 @@ it('initializes shared storage only after acquiring the preflight stage lock', a
     expect(prepareWindowsSignatureCacheDirectory).toHaveBeenCalledOnce()
   })
   await packageTarget(parseDesktopPackageInvocation(['win-x64'], 'win32', 'x64'), environment, run)
+})
+
+it.each(['packages/client/ui-qzos', 'packages/host/qzos-employees'])('stops before runtime assembly when private package %s cannot be packed', async (directory) => {
+  const failure = `--dir ${directory} pack --pack-destination ${desktopTargetBuildPaths('win-x64').packedDsh}`
+  const { run, stages } = supervisor(failure)
+  await expect(packageTarget(parseDesktopPackageInvocation(['win-x64', '--unsigned'], 'win32', 'x64'), {
+    ...environment, DSH_DESKTOP_WINDOWS_UNSIGNED_UPDATES: '1',
+  }, run)).rejects.toThrow('stage refused')
+  expect(stages.at(-1)).toBe(failure)
+  expect(stages).not.toContain('run prepare:packages')
+  expect(stages).not.toContain('run prepare:dsh')
+  expect(writeFileSync).not.toHaveBeenCalled()
 })
 
 it.each(['preflight:windows-signing', 'run build:official', 'run sign:primary-runtime', 'run prepare:dsh --defer-runtime-smoke', 'run sign:primary-runtime --dsh',
