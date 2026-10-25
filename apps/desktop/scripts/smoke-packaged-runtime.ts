@@ -29,4 +29,8 @@ if (windows && windowsUnsignedUpdates(process.env, 'win32')) {
   const expected = resolveDesktopAutoUpdateConfig(process.env, 'win32', 'x64')
   if (value?.provider !== 'generic' || value.url !== expected.publicUrl || value.channel !== expected.channel
     || value.publisherName != null) throw new Error('Unsigned Windows package has an invalid update feed or publisher requirement')
+  if (expected.environment === 'test'
+    && value.updaterCacheDirName !== `qzos-desktop-test-${process.env.DOWNLOAD_TEST_RELEASE_ID?.trim()}-updater`) {
+    throw new Error('Unsigned Windows test package must use its own updater cache')
+  }
 }

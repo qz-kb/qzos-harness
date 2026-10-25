@@ -153,6 +153,8 @@ QZOS 未签名更新要求填写所选环境的真实下载 origin（`DOWNLOAD_T
 
 保持相同应用 ID、部署环境、release ID 和更新源，构建两个递增的原生安装包版本。先安装旧包，再按[自有服务器导出](../publishing/README.zh.md#qzos-self-hosted)准备新包，核对检查更新、明确下载、任务保护、确认重启、替换和数据保留；还需验证损坏下载被拒绝、下载失败后可重试。QZOS 业务客户端兼容版本仍独立于 DSH 原生安装包版本。构建、导出和单元测试通过不表示已安装升级验证通过。
 
+Windows 未签名测试包内置启动引导，在主程序加载前选择 Electron 应用数据目录下的 `qzos-desktop-test/<release-id>/`。两个版本共用隔离的用户／会话数据、Harness home、Agent 配置及日志；安装器重启没有携带原命令行参数或环境时也保持这些路径。包名、更新缓存及 `qzos-test-<release-id>` 协议按批次独立。生产包保持现有入口及数据行为，测试数据不迁入生产。
+
 <a id="local-macos-dmg-without-release-signing"></a>
 
 ## 无发布签名的本地 macOS DMG

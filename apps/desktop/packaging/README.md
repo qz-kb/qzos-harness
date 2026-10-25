@@ -153,6 +153,8 @@ QZOS unsigned updates require the selected real download origin (`DOWNLOAD_TEST_
 
 Build two increasing native package versions under the same app ID, deployment, release ID and feed. Install the older package, stage the newer package using [self-hosted export](../publishing/README.md#qzos-self-hosted), then verify checks, explicit download, task protection, confirmed restart, replacement and retained data. Also verify a corrupt download is rejected and a failed download can be retried. QZOS business-client compatibility remains independent from the DSH native package version. Building, exporting and passing unit tests do not prove an installed upgrade.
 
+Unsigned Windows test packages include a bootstrap that selects `qzos-desktop-test/<release-id>/` under Electron's application-data directory before loading the main program. Both versions share isolated user/session data, Harness home, agent configuration and journals, even when the installer restarts without the original command-line options or environment. Their package name, updater cache and `qzos-test-<release-id>` protocol are batch-specific. Production packages keep their existing entry and data behavior; test data is not migrated into production.
+
 <a id="local-macos-dmg-without-release-signing"></a>
 
 ## Local macOS DMG without release signing

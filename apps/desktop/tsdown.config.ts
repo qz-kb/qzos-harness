@@ -49,6 +49,10 @@ export default defineConfig([
   {
     entry: ['lib/types/main.js'],
     plugins: [packagedImportsPlugin(mainProcessImports)],
+    // TypeScript emits main.js below lib/types; keep the shared packaging helper at its source location.
+    alias: {
+      '../scripts/installed-update-identity.mjs': fileURLToPath(new URL('./scripts/installed-update-identity.mjs', import.meta.url)),
+    },
     define: clientVersionDefine,
     onSuccess: async () => {
       await build({

@@ -97,6 +97,7 @@ export function createElectronBuilderConfig(
   }
   const unsignedUpdates = windowsUnsignedUpdates(env, resolvedPlatform)
   const update = unsigned && !unsignedUpdates ? undefined : resolveDesktopAutoUpdateConfig(env, resolvedPlatform, resolvedArch)
+  const testReleaseId = unsignedUpdates && update?.environment === 'test' ? env.DOWNLOAD_TEST_RELEASE_ID?.trim() : undefined
   if (preparedRuntime !== undefined) buildPaths.dsh = preparedRuntime
   // electron-builder merges extraMetadata into the packaged manifest, so a build version here reaches
   // the artifact names, the update feed, and the installed app.getVersion() the updater compares against.
@@ -106,10 +107,13 @@ export function createElectronBuilderConfig(
   const packaged = resolveDesktopBuildCommit(env)
   return {
     appId,
-    protocols: [{ name: 'DeepSeek Harness', schemes: ['dsh'] }],
+    protocols: testReleaseId === undefined ? [{ name: 'DeepSeek Harness', schemes: ['dsh'] }]
+      : [{ name: 'QZOS update test', schemes: [`qzos-test-${testReleaseId}`] }],
     extraMetadata: {
       dshDesktopAppId: appId,
       ...(unsignedUpdates ? { qzosWindowsUpdateTrust: 'unsigned-https' } : {}),
+      ...(testReleaseId === undefined ? {} : { name: `qzos-desktop-test-${testReleaseId}`,
+        main: 'windows-test-bootstrap.mjs', qzosDesktopTestReleaseId: testReleaseId }),
       dshDesktopUpdateChannel: update?.channel ?? 'nightly',
       ...(policy === undefined ? {} : { dshMandatoryUpdatePolicy: policy }),
       ...buildVersion === productVersion ? {} : { version: buildVersion },
@@ -136,6 +140,9 @@ export function createElectronBuilderConfig(
       return true
     },
     files: [
+      ...(testReleaseId === undefined ? [] : ['windows-test-bootstrap.mjs', 'installed-update-identity.mjs'].map(name => ({
+        from: fileURLToPath(new URL(name, import.meta.url)), to: name,
+      }))),
       'lib/main.js',
       'lib/welcome/**/*',
       'lib/preload-app.cjs',

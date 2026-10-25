@@ -25,6 +25,10 @@ it('enables only the explicit unsigned Windows feed without signing credentials'
   expect(config.win.verifyUpdateCodeSignature).toBe(false)
   expect(config.win.signtoolOptions.publisherName).toBeUndefined()
   expect(config.extraMetadata.qzosWindowsUpdateTrust).toBe('unsigned-https')
+  expect(config.extraMetadata.name).toBe(`qzos-desktop-test-${env.DOWNLOAD_TEST_RELEASE_ID}`)
+  expect(config.extraMetadata.main).toBe('windows-test-bootstrap.mjs')
+  expect(config.extraMetadata.qzosDesktopTestReleaseId).toBe(env.DOWNLOAD_TEST_RELEASE_ID)
+  expect(config.protocols).toEqual([{ name: 'QZOS update test', schemes: [`qzos-test-${env.DOWNLOAD_TEST_RELEASE_ID}`] }])
   expect(config.publish).toEqual([{ provider: 'generic', url: `https://updates.example.com/${prefix}/feeds/win-x64/`, channel: 'nightly' }])
   expect(config.artifactName).toContain('-unsigned.')
   expect(() => windowsUnsignedUpdates(env, 'darwin')).toThrow(/Windows/)
@@ -32,8 +36,20 @@ it('enables only the explicit unsigned Windows feed without signing credentials'
   expect(() => createElectronBuilderConfig({ ...env, DOWNLOAD_TEST_ORIGIN: 'http://unsafe.example.com' }, 'win32', 'x64')).toThrow(/HTTPS/)
   const local = createElectronBuilderConfig({ ...env, DSH_DESKTOP_WINDOWS_UNSIGNED_UPDATES: '0' }, 'win32', 'x64')
   expect(local.publish).toBeNull()
+  expect(local.extraMetadata.main).toBeUndefined()
   expect(local.win.verifyUpdateCodeSignature).toBe(true)
   expect(windowsUnsignedUpdates({}, 'darwin')).toBe(false)
+})
+
+it('keeps production launches out of the test-data bootstrap', () => {
+  const config = createElectronBuilderConfig({ ...env, DSH_DESKTOP_AUTO_UPDATE_ENV: 'production',
+    DOWNLOAD_PROD_ORIGIN: 'https://updates.example.com',
+    DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN: 'https://policy.example.com',
+    DSH_DESKTOP_MANDATORY_UPDATE_CONFIG: '{}' }, 'win32', 'x64')
+  expect(config.extraMetadata.main).toBeUndefined()
+  expect(config.extraMetadata.name).toBeUndefined()
+  expect(config.extraMetadata.qzosDesktopTestReleaseId).toBeUndefined()
+  expect(config.protocols).toEqual([{ name: 'DeepSeek Harness', schemes: ['dsh'] }])
 })
 
 async function fixture() {

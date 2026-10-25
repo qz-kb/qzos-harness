@@ -13,7 +13,8 @@ export interface DesktopElectronBuilderConfig {
     { readonly from: string, readonly to: 'dsh', readonly filter: readonly ['**/*'] },
     { readonly from: string, readonly to: 'dsh/node_modules', readonly filter: readonly ['**/*'] },
   ]
-  readonly extraMetadata: { readonly qzosWindowsUpdateTrust?: string; readonly dshDesktopAppId: string }
+  readonly extraMetadata: { readonly qzosWindowsUpdateTrust?: string; readonly dshDesktopAppId: string;
+    readonly name?: string; readonly main?: string; readonly qzosDesktopTestReleaseId?: string }
   readonly asarUnpack: readonly string[]
   readonly extraResources: readonly [
     { readonly from: string, readonly to: 'runtime' },

@@ -25,3 +25,43 @@ export function configureInstalledUpdateIdentity(app, run, metadata, environment
   environment.DSH_DESKTOP_UPDATE_JOURNAL_DIR = paths.journals
   return paths
 }
+
+/**
+ * Isolate self-hosted unsigned test packages on every launch, including installer restarts.
+ * @param {{ getPath(name: string): string, setPath(name: string, path: string): void }} app Electron paths before main loads.
+ * @param {{ name?: string, qzosDesktopTestReleaseId?: string, qzosWindowsUpdateTrust?: string }} metadata Installed test metadata.
+ * @param {NodeJS.ProcessEnv} environment Environment inherited by the Host and installer.
+ * @returns {{ root: string, userData: string, harnessHome: string, agentsHome: string, journals: string }} Stable batch-owned paths.
+ */
+export function configureUnsignedWindowsTestIdentity(app, metadata, environment) {
+  const id = metadata.qzosDesktopTestReleaseId
+  if (unsignedWindowsTestProtocol(metadata) === undefined || typeof id !== 'string') {
+    throw new Error('installed update: invalid unsigned test package identity')
+  }
+  const root = join(app.getPath('appData'), 'qzos-desktop-test', id)
+  const paths = { root, userData: join(root, 'user-data'), harnessHome: join(root, 'dsh-home'),
+    agentsHome: join(root, 'agents-home'), journals: join(root, 'journals') }
+  for (const directory of [paths.userData, paths.harnessHome, paths.agentsHome, paths.journals]) mkdirSync(directory, { recursive: true })
+  app.setPath('userData', paths.userData)
+  app.setPath('sessionData', paths.userData)
+  environment.DSH_HOME = paths.harnessHome
+  environment.DSH_AGENTS_HOME = paths.agentsHome
+  environment.DSH_DESKTOP_UPDATE_JOURNAL_DIR = paths.journals
+  return paths
+}
+
+/**
+ * Read the batch protocol without allowing a test package to claim the installed DSH handler.
+ * @param {unknown} metadata Installed manifest.
+ * @returns {string | undefined} Test protocol, or undefined for an ordinary package.
+ */
+export function unsignedWindowsTestProtocol(metadata) {
+  if (typeof metadata !== 'object' || metadata === null || !('qzosDesktopTestReleaseId' in metadata)) return undefined
+  const id = metadata.qzosDesktopTestReleaseId
+  if (typeof id !== 'string' || !/^[a-f0-9]{32}$/u.test(id)
+    || !('name' in metadata) || metadata.name !== `qzos-desktop-test-${id}`
+    || !('qzosWindowsUpdateTrust' in metadata) || metadata.qzosWindowsUpdateTrust !== 'unsigned-https') {
+    throw new Error('installed update: invalid unsigned test package identity')
+  }
+  return `qzos-test-${id}`
+}
