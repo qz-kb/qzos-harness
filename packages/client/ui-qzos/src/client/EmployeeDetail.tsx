@@ -15,7 +15,7 @@ import { ResourceTable } from './ResourceTable.tsx'
 import { resourceCopy, type ResourceText } from './resource-copy.ts'
 import css from './Resources.module.css'
 import { publicationArtwork } from './resource-artwork.ts'
-import { employeeDraft, saveEmployee } from './employee-client.ts'
+import { correctionStorageKey, employeeDraft, readCorrection, rememberCorrection, saveEmployee } from './employee-client.ts'
 import { knowledgeDraft, knowledgeRows, knowledgeText, knowledgeRequest } from './knowledge-client.ts'
 import { publicVisitorApi, loginRecord, storedLogin, type LoginRecord } from './login-client.ts'
 import type { QzosKey } from './locales.ts'
@@ -50,6 +50,7 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
   const pending = useRef(false)
   const [revision, setRevision] = useState(0)
   const epoch = useStore(state => state.businessEpoch)
+  const businessUser = useStore(state => state.businessUser)
   const [editTab, setEditTab] = useState<ResourceForm | 'bindings'>('employeeBase')
   const [draft, setDraft] = useState(() => employeeDraft(original))
   const [menuValues, setMenuValues] = useState(() => knowledgeRows(original.menus))
@@ -99,8 +100,16 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
   const unsupported = () => { setNotice(t('employeeUnsupported')) }
   const update = (key: string, value: string) =>{  setDraft(current => ({ ...current, [key]: value })) }
   const show = (kind: EmployeeDialog['kind'], row?: PreviewRow, readOnly = false) => {
-    setIssuedKey(''); setSelectedKey(''); setCalls(null)
-    setDialogDraft(resourceDraft(row ? { ...row, feedback_type: 'correction', feedback_key: randomUUID(), correction_key: randomUUID(), password: '', quotaDaily: row.limit_today_chat ?? '0', quotaTotal: row.limit_total_chat ?? '0' } : {}))
+    setIssuedKey(''); setSelectedKey(''); setCalls(null); setNotice('')
+    const values = resourceDraft(row ? { ...row, feedback_type: 'correction', feedback_key: randomUUID(), correction_key: randomUUID(), password: '', quotaDaily: row.limit_today_chat ?? '0', quotaTotal: row.limit_total_chat ?? '0' } : {})
+    if (kind === 'correct' && row) {
+      if (!businessUser) { setNotice(t('correctionRecoveryUnavailable')); return }
+      try {
+        const saved = readCorrection(sessionStorage, correctionStorageKey(businessUser, item.id, row.id))
+        if (saved) Object.assign(values, saved)
+      } catch { setNotice(t('correctionRecoveryUnavailable')); return }
+    }
+    setDialogDraft(values)
     setDialog({ kind, readOnly, ...row ? { row } : {} })
   }
   const saveDialog = () => { void perform(async () => {
@@ -117,8 +126,12 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
       await request('/kb.share/edit', { id: Number(dialog.row.id), limit_today_chat: Number(dialogDraft.quotaDaily), limit_total_chat: Number(dialogDraft.quotaTotal) })
     } else if (dialog.kind === 'feedback' && dialog.row) {
       await request('/v1/kb/feedback', { robot_id: Number(item.id), record_id: Number(dialog.row.id), type: dialogDraft.feedback_type, idempotency_key: dialogDraft.feedback_key, content: dialogDraft.feedback_type === 'correction' ? dialogDraft.feedback : '' })
-    } else if (dialog.kind === 'correct' && dialogDraft.kb_id) {
+    } else if (dialog.kind === 'correct' && dialogDraft.kb_id && dialog.row && businessUser) {
+      const key = correctionStorageKey(businessUser, item.id, dialog.row.id)
+      try { rememberCorrection(sessionStorage, key, dialogDraft) }
+      catch { throw new Error(t('correctionRecoveryUnavailable')) }
       await request('/kb.chat/chatCorrect', { request_id: dialogDraft.correction_key, kb_id: Number(dialogDraft.kb_id), ask: dialogDraft.question, reply: dialogDraft.answer, images: [], files: [], video: [] })
+      sessionStorage.removeItem(key)
     } else { unsupported(); return }
     setDialog(null); refresh(); setNotice(t('kbSaved'))
   }) }

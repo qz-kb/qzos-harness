@@ -1,6 +1,6 @@
 /** QZOS employee configuration adapter; business identity stays in the shared transport. */
 import { knowledgeDraft, knowledgeText, knowledgeRequest } from './knowledge-client.ts'
-import { loginRecord, storedLogin, type LoginRecord } from './login-client.ts'
+import { loginApi, loginRecord, storedLogin, type LoginRecord } from './login-client.ts'
 import type { Example } from './catalog.ts'
 import type { PreviewValues } from './resource-schema.ts'
 
@@ -77,4 +77,38 @@ export async function saveEmployee(original: LoginRecord, draft: PreviewValues, 
     const actual = (savedDraft.kb_ids ?? '').split(',').filter(Boolean).sort()
     if (saved.knowledge_rebind_required || JSON.stringify(expected) !== JSON.stringify(actual)) throw new Error('知识库关联保存回读不一致，请刷新核对后重试')
   }
+}
+
+/** Scope a pending correction to its backend, account and conversation record.
+ * @param userId - Authenticated business account.
+ * @param employeeId - Employee owning the record.
+ * @param recordId - Server-owned conversation record.
+ * @returns Browser session-storage key containing no credentials.
+ */
+export function correctionStorageKey(userId: string, employeeId: string, recordId: string): string {
+  return 'qzos.correction.v1:' + JSON.stringify([loginApi, userId, employeeId, recordId])
+}
+const correctionFields = ['correction_key', 'kb_id', 'question', 'answer'] as const
+/** Restore only submitted correction fields; invalid saved state must not silently create a new request.
+ * @param storage - Current tab's session storage.
+ * @param key - Account/employee/record-scoped key.
+ * @returns Pending submission, or undefined when none exists.
+ */
+export function readCorrection(storage: Storage, key: string): PreviewValues | undefined {
+  const raw = storage.getItem(key)
+  if (raw === null) return undefined
+  const value = loginRecord(JSON.parse(raw))
+  if (correctionFields.some(field => typeof value[field] !== 'string')
+    || !/^[a-zA-Z0-9_-]{8,128}$/.test(String(value.correction_key)) || !/^[1-9][0-9]*$/.test(String(value.kb_id))) {
+    throw new Error('Invalid pending correction')
+  }
+  return knowledgeDraft(Object.fromEntries(correctionFields.map(field => [field, value[field]])))
+}
+/** Persist the submitted payload before the API call, excluding unrelated UI fields and credentials.
+ * @param storage - Current tab's session storage.
+ * @param key - Account/employee/record-scoped key.
+ * @param draft - Exact correction about to be submitted.
+ */
+export function rememberCorrection(storage: Storage, key: string, draft: PreviewValues): void {
+  storage.setItem(key, JSON.stringify(Object.fromEntries(correctionFields.map(field => [field, draft[field] ?? '']))))
 }
