@@ -387,4 +387,4 @@ node apps/desktop/node_modules/pnpm/bin/pnpm.mjs --dir apps/desktop run test:upd
 
 本二开保留 DSH 原生更新协调器、任务退出保护、下载与重启确认。QZOS 安装包要求独立的应用标识、下载源和策略源；拒绝使用上游 DeepSeek 身份及源。生产机器预设必须填写 `DOWNLOAD_PROD_ORIGIN`，分发对象使用 `qzos-desktop` 路径。示例使用 `com.qzos.desktop`；签名身份、证书与更新服务配置应归部署方所有，源码不附带签名凭据。
 
-`ui-qzos` 的统一产品日志只读展示 QZOS 业务客户端兼容版本，与所含上游 DSH 运行时版本独立。它不替代原生更新器，查看日志也不等于同意安装。macOS／Windows 签名安装与重启验证需要部署方的隔离签名配置和更新源。
+`ui-qzos` 的统一产品日志只读展示 QZOS 业务客户端兼容版本，与所含上游 DSH 运行时版本独立。它不替代原生更新器，查看日志也不等于同意安装。Windows 可使用明确配置的未签名 HTTPS 路线，见[打包](packaging/README.zh.md#unsigned-windows-test-installer)和[自有服务器导出](publishing/README.zh.md#qzos-self-hosted)。真实 Windows 安装与重启验证仍需隔离 Windows 主机和已配置服务；macOS 签名要求不变。

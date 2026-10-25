@@ -65,7 +65,7 @@ it('requires one signing preflight before building, then records only the comple
   }
   expect(writeFileSync).toHaveBeenCalledOnce()
   const record = JSON.parse(vi.mocked(writeFileSync).mock.calls[0]![1] as string) as { publicUrl: string }
-  expect(record.publicUrl).toBe('https://updates.example.com/dsh-desk/0123456789abcdef0123456789abcdef/feeds/win-x64/')
+  expect(record.publicUrl).toBe('https://updates.example.com/qzos-desktop/0123456789abcdef0123456789abcdef/feeds/win-x64/')
 })
 
 it('initializes shared storage only after acquiring the preflight stage lock', async () => {
@@ -220,4 +220,26 @@ it('fails debugging packages when runtime verification fails', async () => {
     .rejects.toThrow('stage refused')
   expect(stages.at(-1)).toBe(failure)
   expect(writeFileSync).not.toHaveBeenCalled()
+})
+
+it('records explicitly unsigned Windows updates after smoke verification without a token', async () => {
+  const { run, stages } = supervisor()
+  await packageTarget(parseDesktopPackageInvocation(['win-x64', '--unsigned'], 'win32', 'x64'), {
+    ...environment, DSH_DESKTOP_WINDOWS_UNSIGNED_UPDATES: '1',
+  }, run)
+  expect(stages.some(stage => stage.includes('sign:') || stage.includes('preflight:windows-signing'))).toBe(false)
+  expect(stages.at(-1)).toBe('exec tsx scripts/smoke-packaged-runtime.ts --unsigned')
+  const written = vi.mocked(writeFileSync).mock.calls.find(([path]) => String(path).endsWith('win-x64-release.json.tmp'))
+  expect(written).toBeDefined()
+  expect(String(written![0])).toContain('unsigned')
+  expect(JSON.parse(String(written![1]))).toMatchObject({ signing: 'unsigned', target: 'win-x64', appId: 'com.example.test',
+    publicUrl: 'https://updates.example.com/qzos-desktop/unsigned/0123456789abcdef0123456789abcdef/feeds/win-x64/' })
+})
+
+it('never records an unsigned update when the packaged runtime fails', async () => {
+  const { run } = supervisor('exec tsx scripts/smoke-packaged-runtime.ts --unsigned')
+  await expect(packageTarget(parseDesktopPackageInvocation(['win-x64', '--unsigned'], 'win32', 'x64'), {
+    ...environment, DSH_DESKTOP_WINDOWS_UNSIGNED_UPDATES: '1',
+  }, run)).rejects.toThrow('stage refused')
+  expect(vi.mocked(writeFileSync).mock.calls.some(([path]) => String(path).endsWith('win-x64-release.json.tmp'))).toBe(false)
 })

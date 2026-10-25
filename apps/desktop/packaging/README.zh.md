@@ -144,9 +144,14 @@ bash apps/desktop/scripts/macos-runner-service.sh status "$HOME/dsh-ci/runner"
 pnpm run package:desktop:win:x64:unsigned
 ```
 
-该命令读取 `.env.windows`，要求设置 `DSH_DESKTOP_APP_ID` 和[强制更新策略配置](../README.zh.md#mandatory-update-policy)，包括真实的 HTTPS 服务 origin。本机验收和 CI 使用 Node 24；其他工具为根 `packageManager` 固定版本的 pnpm、Git、PowerShell、tar、Python、Visual C++ Build Tools 和 Windows SDK。Python 不在 `PATH` 中时设置 `PYTHON`。命令将安装包写入 `.desktop-build/targets/win-x64/unsigned-artifacts/`，省略普通自动更新配置，清除签名凭据，且不生成发布完成记录。无需 EV 或上传凭据。签名打包和上传仍遵循正式发布要求。
+该命令读取 `.env.windows`，要求设置 `DSH_DESKTOP_APP_ID` 和[强制更新策略配置](../README.zh.md#mandatory-update-policy)，包括真实的 HTTPS 服务 origin。本机验收和 CI 使用 Node 24；其他工具为根 `packageManager` 固定版本的 pnpm、Git、PowerShell、tar、Python、Visual C++ Build Tools 和 Windows SDK。Python 不在 `PATH` 中时设置 `PYTHON`。命令将安装包写入 `.desktop-build/targets/win-x64/unsigned-artifacts/` 并清除签名凭据，无需 EV 或上传凭据。未设置 `DSH_DESKTOP_WINDOWS_UNSIGNED_UPDATES=1` 时，省略普通更新配置且不生成发布完成记录。QZOS Windows 模板明确启用该设置：未签名包会包含 generic HTTPS 更新源，仅在打包运行时和更新源校验通过后写入标为 `unsigned` 的完成记录。签名打包及 macOS 仍沿用现有要求；选择 Windows 签名打包时将该设置改为 `0`。
 
 先运行 `pnpm install --frozen-lockfile`，再运行 `pnpm run package:desktop:win:x64:unsigned --check` 校验配置和工具，最后执行上面的完整命令。打包自行执行完整构建和隔离的运行时 smoke，不调用在线模型。阶段日志保留在 `.desktop-build/packaging-runs/`；仅构建成功不代表安装包验证通过。依赖安装和运行时准备需要访问 npm、GitHub release 资源和 nodejs.org；网络需要时使用现有 registry 和代理配置。缓存与工具位置属于构建机器配置，不在跟踪文件中固定个人路径。
+
+
+QZOS 未签名更新要求填写所选环境的真实下载 origin（`DOWNLOAD_TEST_ORIGIN` 或 `DOWNLOAD_PROD_ORIGIN`）、现有策略服务 origin 及 QZOS 应用 ID。测试构建还需固定的 32 字符 release ID，旧版和新版测试包共用它。未签名更新源使用 `qzos-desktop/unsigned/`，与签名更新源分开。只有这一明确的 Windows 模式省略 Authenticode 发布者验证，仍保留 HTTPS、更新器大小／SHA-512 校验、版本顺序、用户下载／重启决定、任务退出保护和 NSIS 替换。哈希校验不能认证发布者。Windows 可能显示“未知发布者”、SmartScreen 或企业策略提示，也可能拒绝安装；应用不会绕过系统策略。分发前必须在隔离 Windows 主机验证，macOS 不属于这条路线。
+
+保持相同应用 ID、部署环境、release ID 和更新源，构建两个递增的原生安装包版本。先安装旧包，再按[自有服务器导出](../publishing/README.zh.md#qzos-self-hosted)准备新包，核对检查更新、明确下载、任务保护、确认重启、替换和数据保留；还需验证损坏下载被拒绝、下载失败后可重试。QZOS 业务客户端兼容版本仍独立于 DSH 原生安装包版本。构建、导出和单元测试通过不表示已安装升级验证通过。
 
 <a id="local-macos-dmg-without-release-signing"></a>
 

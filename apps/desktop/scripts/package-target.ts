@@ -5,6 +5,7 @@ import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node
 import { parseArgs } from 'node:util'
 import { join, resolve } from 'node:path'
 import {
+  windowsUnsignedUpdates,
   desktopBuildRecordFilename,
   resolveDesktopAutoUpdateConfig,
 } from './desktop-auto-update-environment.mjs'
@@ -89,7 +90,7 @@ const TARGETS: Record<DesktopPackageTargetName, DesktopPackageTarget> = {
  */
 export function withoutWindowsSigningEnvironment(environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return Object.fromEntries(Object.entries(environment)
-    .filter(([name]) => !name.startsWith(WINDOWS_SIGNING_ENV_PREFIX)))
+    .filter(([name]) => (!name.startsWith(WINDOWS_SIGNING_ENV_PREFIX) || name === 'DSH_DESKTOP_WINDOWS_UNSIGNED_UPDATES')))
 }
 
 /**
@@ -150,6 +151,8 @@ function writeReleaseRecord(
   const temporaryPath = `${recordPath}.tmp`
   writeFileSync(temporaryPath, `${JSON.stringify({
     schemaVersion: 1,
+    signing: environment.DSH_DESKTOP_UNSIGNED === '1' ? 'unsigned' : 'signed',
+    appId: environment.DSH_DESKTOP_APP_ID,
     target: target.name,
     version: buildVersion,
     environment: update.environment,
@@ -425,12 +428,13 @@ export async function packageTarget(
   const mac = target.platform === 'darwin' ? resolveMacOSPackageSettings(environment) : undefined
   const packArguments = mac === undefined ? [] : ['--concurrency', String(mac.packConcurrency)]
   const buildPaths = desktopTargetBuildPaths(target.name)
-  const releaseRecordPath = join(buildPaths.artifacts, desktopBuildRecordFilename(target.name))
-  if (!invocation.prepareOnly && !invocation.unsigned && !invocation.skipNotarization) {
+  const artifactsRoot = desktopArtifactOutput(buildPaths, invocation).directory
+  const unsignedUpdates = windowsUnsignedUpdates({ ...environment, DSH_DESKTOP_UNSIGNED: invocation.unsigned ? '1' : '0' }, target.platform)
+  const releaseRecordPath = join(artifactsRoot, desktopBuildRecordFilename(target.name))
+  if (!invocation.prepareOnly && (!invocation.unsigned || unsignedUpdates) && !invocation.skipNotarization) {
     rmSync(releaseRecordPath, { force: true })
     rmSync(`${releaseRecordPath}.tmp`, { force: true })
   }
-  const artifactsRoot = desktopArtifactOutput(buildPaths, invocation).directory
   const buildEnv = withoutWindowsSigningEnvironment(withoutDesktopUploadCredentials(
     desktopElectronBuilderEnvironment(environment, invocation.unsigned)))
   const targetEnv: NodeJS.ProcessEnv = {
@@ -523,8 +527,8 @@ export async function packageTarget(
     await execute(['exec', 'tsx', 'scripts/smoke-packaged-runtime.ts',
       ...(invocation.unsigned ? ['--unsigned'] : []), ...(invocation.skipNotarization ? ['--skip-notarization'] : [])], targetEnv)
   }
-  if (!invocation.directory && !invocation.unsigned && !invocation.skipNotarization) {
-    writeReleaseRecord(target, electronBuilderEnv, buildPaths.artifacts)
+  if (!invocation.directory && (!invocation.unsigned || unsignedUpdates) && !invocation.skipNotarization) {
+    writeReleaseRecord(target, electronBuilderEnv, artifactsRoot)
   }
   if (journal) recordPackagingEvent(journal, { type: 'artifacts', directory: artifactsRoot })
 }

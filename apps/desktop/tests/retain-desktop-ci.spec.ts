@@ -10,8 +10,8 @@ const roots: string[] = []
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))) })
 
 it.each([
-  ['mac-arm64', 'notarized'], ['win-x64', 'signed'], ['mac-arm64', 'unnotarized'], ['win-x64', 'unsigned'],
-] as const)('retains the complete %s %s release without signing or upload credentials', async (target, qualification) => {
+  ['mac-arm64', 'notarized'], ['win-x64', 'signed'], ['mac-arm64', 'unnotarized'], ['win-x64', 'unsigned'], ['win-x64', 'unsigned', true],
+] as const)('retains the complete %s %s release without signing or upload credentials', async (target, qualification, unsignedUpdates: boolean = false) => {
   const root = await mkdtemp(join(tmpdir(), 'retain-ci-'))
   roots.push(root)
   const appRoot = join(root, 'checkout')
@@ -21,11 +21,12 @@ it.each([
   await mkdir(artifacts, { recursive: true })
   await mkdir(join(config, 'presets'), { recursive: true })
   await writeFile(join(appRoot, 'package.json'), '{"version":"1.0.0"}')
-  await writeFile(join(config, 'presets/test.env'), `DSH_DESKTOP_AUTO_UPDATE_ENV=test\nDOWNLOAD_TEST_RELEASE_ID=${'a'.repeat(32)}\n`)
+  await writeFile(join(config, 'presets/test.env'), `DSH_DESKTOP_AUTO_UPDATE_ENV=test\nDOWNLOAD_TEST_RELEASE_ID=${'a'.repeat(32)}\n${unsignedUpdates ? 'DSH_DESKTOP_WINDOWS_UNSIGNED_UPDATES=1\n' : ''}`)
   const names = debug ? (target === 'win-x64' ? [`deepseek-harness-1.0.0-win-x64-${qualification}.exe`]
     : [`deepseek-harness-1.0.0-mac-arm64-${qualification}.dmg`, `deepseek-harness-1.0.0-mac-arm64-${qualification}.zip`]) : target === 'win-x64'
     ? ['deepseek-harness-1.0.0-win-x64.exe', 'deepseek-harness-1.0.0-win-x64.exe.blockmap', 'win-x64-release.json', 'nightly.yml']
     : ['deepseek-harness-1.0.0-mac-arm64.dmg', 'deepseek-harness-1.0.0-mac-arm64.zip', 'deepseek-harness-1.0.0-mac-arm64.zip.blockmap', 'mac-arm64-release.json', 'nightly-mac.yml']
+  if (unsignedUpdates) names.push('deepseek-harness-1.0.0-win-x64-unsigned.exe.blockmap', 'win-x64-release.json', 'nightly.yml')
   await Promise.all(names.map(name => writeFile(join(artifacts, name), 'fixture')))
   const env = {
     DSH_PACKAGING_CONFIG_DIR: config, DSH_PACKAGING_PRESET: 'test', DSH_DESKTOP_TARGET_PLATFORM: target === 'win-x64' ? 'win32' : 'darwin',
@@ -40,7 +41,10 @@ it.each([
   expect(manifest.source).toMatchObject({ target, qualification })
   expect(manifest.source.publishRequested).toBeUndefined()
   const summary = await readFile(env.GITHUB_STEP_SUMMARY, 'utf8')
-  if (debug) {
+  if (unsignedUpdates) {
+    expect(summary).toContain('export-windows-update.ts')
+    expect(summary).toContain('no files have been published')
+  } else if (debug) {
     expect(summary).toContain('不能发布到 test 或 production')
     expect(summary).not.toContain('Publish separately')
     await expect(prepareDesktopPublication({ ...env, DESKTOP_PUBLISH_ROUTE: JSON.stringify({
