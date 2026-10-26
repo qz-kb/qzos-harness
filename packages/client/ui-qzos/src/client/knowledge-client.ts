@@ -104,21 +104,26 @@ export function installKnowledgeResources(ctx: Context): (panel: string) => void
         const kind = url.pathname.slice(1)
         if (kind === 'list' || kind === 'employees') {
           do {
-            try {
-              const rows = await knowledgePages(kind === 'list' ? '/kb.know/lists?type=0' : '/kb.robot/lists', signal)
-              if (signal.aborted) return
-              yield { ok: true as const, value: { rows } }
-            } catch (error) {
-              if (signal.aborted) return
-              if (error instanceof LoginError && [-1, -2].includes(error.code)) yield { ok: true as const, value: { rows: [] } }
-              yield { ok: false as const, error: Object.assign(new Error(error instanceof Error ? error.message : 'QZOS request failed'), { code: 'gateway/internal' as const, details: {}, isDSHRemoteError: true as const }) }
-            }
-            await new Promise<void>((resolve) => {
-              const resume = () => { refreshes.removeEventListener(kind, resume); signal.removeEventListener('abort', resume); resolve() }
+            // Subscribe before fetching so a refresh during the request queues one more read.
+            let resume!: () => void
+            const refreshed = new Promise<void>((resolve) => {
+              resume = () => { refreshes.removeEventListener(kind, resume); signal.removeEventListener('abort', resume); resolve() }
               refreshes.addEventListener(kind, resume, { once: true })
               signal.addEventListener('abort', resume, { once: true })
               if (signal.aborted) resume()
             })
+            try {
+              try {
+                const rows = await knowledgePages(kind === 'list' ? '/kb.know/lists?type=0' : '/kb.robot/lists', signal)
+                if (signal.aborted) return
+                yield { ok: true as const, value: { rows } }
+              } catch (error) {
+                if (signal.aborted) return
+                if (error instanceof LoginError && [-1, -2].includes(error.code)) yield { ok: true as const, value: { rows: [] } }
+                yield { ok: false as const, error: Object.assign(new Error(error instanceof Error ? error.message : 'QZOS request failed'), { code: 'gateway/internal' as const, details: {}, isDSHRemoteError: true as const }) }
+              }
+              await refreshed
+            } finally { resume() }
           } while (!signal.aborted)
           return
         }

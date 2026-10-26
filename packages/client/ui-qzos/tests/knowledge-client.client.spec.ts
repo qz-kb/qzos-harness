@@ -71,7 +71,7 @@ it('keeps authorized connections and history when the market is disabled, but pr
   await expect(readConnections(new AbortController().signal)).rejects.toThrow('expired')
 })
 
-it('retains native catalog cards across navigation, refreshes in place and releases the account', async () => {
+it.each(['knowledge', 'employees'])('retains %s cards and coalesces refreshes during a pending read', async (panel) => {
   const { fetcher, values } = setup()
   fetcher.mockResolvedValue(reply({ lists: [{ id: 1, name: 'first' }], count: 1 }))
   const ctx = new Context()
@@ -81,34 +81,41 @@ it('retains native catalog cards across navigation, refreshes in place and relea
   const fiber = ctx.plugin({ apply: (child: Context) => { refresh = installKnowledgeResources(child) } })
   await fiber.await()
   const account = new AbortController()
-  const address = 'dsh-resource://qzos-knowledge/list?epoch=1&revision=0'
+  const kind = panel === 'knowledge' ? 'list' : 'employees'
+  const address = `dsh-resource://qzos-knowledge/${kind}?epoch=1&revision=0`
   const source = registry.source(address)
   try {
     registry.pin(address, account.signal)
     let off = source.subscribe(() => {})
     await vi.waitFor(() => { expect(source.getSnapshot().status).toBe('live') })
     expect(fetcher).toHaveBeenCalledTimes(1)
-    expect(String(fetcher.mock.calls[0]?.[0])).toContain('/kb.know/lists')
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain(panel === 'knowledge' ? '/kb.know/lists' : '/kb.robot/lists')
     off(); off = source.subscribe(() => {})
     expect(source.getSnapshot().value).toEqual({ rows: [{ id: 1, name: 'first' }] })
     expect(fetcher).toHaveBeenCalledTimes(1)
     let finish: ((value: Response) => void) | undefined
     fetcher.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
-    refresh('knowledge')
+    refresh(panel)
     await vi.waitFor(() => { expect(finish).toBeDefined() })
     expect(source.getSnapshot()).toMatchObject({ status: 'live', value: { rows: [{ id: 1 }] } })
-    finish!(reply({ lists: [{ id: 2, name: 'updated' }], count: 1 }))
+    fetcher.mockResolvedValueOnce(reply({ lists: [{ id: 2, name: 'updated' }], count: 1 }))
+    refresh(panel); refresh(panel)
+    expect(fetcher).toHaveBeenCalledTimes(2)
+    finish!(reply({ lists: [{ id: 1, name: 'first' }], count: 1 }))
     await vi.waitFor(() => { expect(source.getSnapshot().value).toEqual({ rows: [{ id: 2, name: 'updated' }] }) })
+    expect(fetcher).toHaveBeenCalledTimes(3)
     fetcher.mockResolvedValueOnce(new Response(JSON.stringify({ code: 0, msg: 'offline' })))
-    refresh('knowledge')
+    refresh(panel)
     await vi.waitFor(() => { expect(source.getSnapshot().status).toBe('failed') })
     expect(source.getSnapshot().value).toEqual({ rows: [{ id: 2, name: 'updated' }] })
     fetcher.mockResolvedValueOnce(new Response(JSON.stringify({ code: -1, msg: 'expired' })))
-    refresh('knowledge')
+    refresh(panel)
     await vi.waitFor(() => { expect(source.getSnapshot().value).toEqual({ rows: [] }) })
     off(); account.abort(); values.clear()
     expect(source.getSnapshot().value).toBeUndefined()
-    const next = registry.source('dsh-resource://qzos-knowledge/list?epoch=2&revision=0')
+    refresh(panel)
+    expect(fetcher).toHaveBeenCalledTimes(5)
+    const next = registry.source(`dsh-resource://qzos-knowledge/${kind}?epoch=2&revision=0`)
     expect(next.getSnapshot().value).toBeUndefined()
   } finally { account.abort(); await fiber.dispose() }
 })
