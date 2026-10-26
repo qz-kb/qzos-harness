@@ -162,13 +162,8 @@ export function installKnowledgeResources(ctx: Context): (panel: string) => void
           case 'employee-share-categories': value = { rows: knowledgeRows(await knowledgeRequest('/kb.robot/categoryLists', undefined, signal)) }; break
           case 'employee': value = { detail: loginRecord(await knowledgeRequest(`/kb.robot/detail?id=${encodeURIComponent(id)}`, undefined, signal)) }; break
           case 'employee-keys': value = { rows: knowledgeRows(await knowledgeRequest(`/kb.publish/keyLists?publish_id=${encodeURIComponent(id)}`, undefined, signal)) }; break
-          case 'employee-stats': {
-            const [counts, usage] = await Promise.all([
-              knowledgeRequest(`/kb.chat/dataCount?robot_id=${encodeURIComponent(id)}`, undefined, signal),
-              knowledgeRequest(`/kb.dsh/summary?robot_id=${encodeURIComponent(id)}`, undefined, signal),
-            ])
-            value = { ...loginRecord(counts), dsh: loginRecord(usage) }; break
-          }
+          case 'employee-stats': value = loginRecord(await knowledgeRequest(`/kb.chat/dataCount?robot_id=${encodeURIComponent(id)}`, undefined, signal)); break
+          case 'employee-usage': value = loginRecord(await knowledgeRequest(`/kb.dsh/summary?robot_id=${encodeURIComponent(id)}`, undefined, signal)); break
           case 'employee-feedback': {
             const to = Math.floor(Date.now() / 1000)
             value = loginRecord(await knowledgeRequest(`/v1/kb/feedback/summary?robot_id=${encodeURIComponent(id)}&from=${to - 30 * 86400}&to=${to}`, undefined, signal)); break

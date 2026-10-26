@@ -204,7 +204,7 @@
 }
 
 /* Original QZOS knowledge workspace; the surrounding DSH shell keeps its own theme. */
-.knowledgePage, .knowledgeTheme {
+.knowledgePage, .knowledgeTheme, .employeePage {
   --dsw-alias-brand-primary: #4b8dff;
   --dsw-alias-button-primary-fill: #4b8dff;
   --dsw-alias-button-primary-hover: #79aaff;
@@ -320,3 +320,111 @@
 .knowledgePage .rowActions button { white-space: nowrap; flex: none; }
 
 .tableSkeleton { height: 100px; margin-top: 12px; border-radius: 12px; background: var(--dsw-alias-bg-layer-1); }
+
+/* Employee pages mirror the original QZOS layout within the private resource panel. */
+.employeePage { background: var(--dsw-alias-bg-module-platform); }
+.employeeSwitch { display: flex; align-self: flex-start; padding: 8px; margin: 10px 28px 0; background: var(--dsw-alias-bg-base); border-radius: 12px; gap: 8px; }
+.employeeSwitch button { padding: 8px 18px; font-size: 16px; font-weight: 600; }
+.employeeSwitch button[aria-pressed='true'] { color: var(--dsw-alias-label-primary-foreground); background: var(--dsw-alias-brand-primary); }
+.employeePage .listHead { padding-top: 16px; }
+.employeePage .listHead h1 { font-size: 16px; }
+.employeePage .listRefresh { padding-top: 0; }
+.employeePage .employeeGrid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
+.employeePage .employeeCard, .employeePage .employeeCreate { border: 0; border-radius: 14px; min-height: 290px; }
+.employeePage .employeeBody { padding: 10px 15px 20px; }
+.employeePage .employeeBody h2 { font-size: 18px; font-weight: 500; margin: 10px 0 12px; }
+.employeePage .employeeBody p { height: 60px; color: var(--dsw-alias-label-tertiary); }
+.employeePage .employeeTop > span { color: var(--dsw-alias-brand-primary); background: var(--dsw-alias-interactive-bg-hover); }
+.employeePage .aside { width: 180px; margin: 16px; border: 0; border-radius: 16px; }
+.employeePage .asideTitle { padding: 0 14px 14px; }
+.employeePage .asideTitle > button { flex: none; border-radius: 50%; width: 30px; height: 30px; padding: 0; color: var(--dsw-alias-brand-primary); box-shadow: 0 2px 12px #0001; }
+.employeePage .asideTitle select { border: 0; min-width: 0; padding: 4px; }
+.employeePage .aside > button { margin: 8px 14px; width: calc(100% - 28px); min-height: 40px; gap: 8px; font-size: 14px; border-radius: 12px; }
+.employeePage .aside > button[aria-pressed='true'] { background: var(--dsw-alias-brand-primary); color: var(--dsw-alias-label-primary-foreground); }
+.employeePage .detailBody { margin: 16px 16px 16px 0; border: 0; border-radius: 16px; }
+.employeePage .employeeDetail { background: var(--dsw-alias-bg-base); }
+.employeePage .employeeDetail > .tabs { position: sticky; top: 0; z-index: 2; padding: 0 20px; }
+.employeePage .employeeDetail > .tabs button { padding: 16px 0; margin-right: 32px; font-size: 15px; }
+.employeePage .employeeDetail > .tabs button[aria-pressed='true'] { color: var(--dsw-alias-brand-primary); }
+.employeePage .employeeDetail > .formFields, .employeePage .employeeDetail > .menuEditor, .employeePage .employeeDetail > .inner { border: 0; border-radius: 0; margin: 0; padding: 24px 28px; }
+.employeePage .employeeDetail > .formFields { max-width: none; gap: 26px; }
+.employeePage .employeeDetail .formRow > label { width: 106px; font-size: 14px; font-weight: 400; }
+.employeePage .formControl { max-width: 600px; }
+.employeePage .employeeDetail .formControl textarea, .employeePage .employeeDetail .formControl select, .employeePage .employeeDetail .formControl > span { background: var(--dsw-alias-bg-base); }
+.employeePage .imagePicker { width: 100px; height: 100px; border-style: solid; border-radius: 6px; background: var(--dsw-alias-bg-base); }
+.employeePage .formFooter { position: sticky; bottom: 0; justify-content: center; border: 0; z-index: 1; padding: 16px; }
+.employeePage .stats > div { background: var(--dsw-alias-bg-module-platform); padding: 20px 8px; }
+.employeePage .platformGrid button { font-size: 16px; background: var(--dsw-alias-bg-module-platform); }
+.employeePage .platformGrid button:disabled { opacity: .8; }
+.employeeDialog.knowledgeTheme > div:first-child > div:first-child { background: var(--dsw-alias-bg-base); border: 0; }
+.employeeDialog.knowledgeTheme .formControl textarea, .employeeDialog.knowledgeTheme .formControl select, .employeeDialog.knowledgeTheme .formControl > span { background: var(--dsw-alias-bg-base); }
+.knowledgeSelect { position: relative; }
+.knowledgeSelect summary { list-style-position: inside; padding: 8px 12px; border: 1px solid var(--dsw-alias-border-l3); border-radius: 6px; cursor: pointer; font-size: 14px; }
+.knowledgeSelect .checkList { padding: 12px; border: 1px solid var(--dsw-alias-border-l3); border-radius: 6px; margin-top: 4px; max-height: 240px; overflow: auto; }
+.knowledgeLinks { display: flex; gap: 8px; margin-top: 6px; }
+.knowledgeLinks button { padding: 0; font-size: 13px; color: var(--dsw-alias-brand-primary); }
+.fieldGroup { display: flex; align-items: center; gap: 20px; margin: 12px 0 0; font-size: 14px; }
+.fieldGroup::before { content: ''; width: 20px; border-top: 1px solid var(--dsw-alias-border-l3); }
+.fieldGroup::after { content: ''; flex: 1; border-top: 1px solid var(--dsw-alias-border-l3); }
+.recallNotice { margin: 6px 0 0; padding: 12px 16px; color: #e6a23c; background: #fdf6ec; border-radius: 4px; }
+.modelScope { margin: 12px 28px 0; color: var(--dsw-alias-label-tertiary); font-size: 12px; }
+.shareEmployee { margin: 16px 28px 0; }
+.menuImages { padding: 20px 0; }
+.menuImageList { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0; }
+.menuImageList > div { position: relative; width: 80px; height: 80px; }
+.menuImageList img { width: 100%; height: 100%; object-fit: cover; border-radius: 6px; border: 1px solid var(--dsw-alias-border-l3); }
+.menuImageList > div > button { position: absolute; right: 0; top: 0; background: var(--dsw-alias-bg-base); }
+.menuImages small { color: var(--dsw-alias-label-tertiary); }
+.menuOrder { margin: 10px 0; }
+.menuOrder { display: flex; gap: 4px; align-items: center; }
+.menuOrder span { flex: 1; }
+.squareContent { padding: 20px 28px; }
+.squareContent .employeeGrid { padding: 20px 0; }
+.sharedEmployeeCard { display: flex; flex-direction: column; align-items: center; gap: 14px; background: var(--dsw-alias-bg-base); border-radius: 14px; padding: 24px; }
+.sharedEmployeeCard > img { width: 74px; height: 74px; border-radius: 50%; }
+.sharedEmployeeCard p { color: var(--dsw-alias-label-tertiary); }
+@media (max-width: 700px) {
+  .employeePage .aside { width: auto; margin: 12px; }
+  .employeePage .aside > button { width: auto; display: inline-flex; margin: 4px; }
+  .employeePage .detailBody { margin: 0 12px 12px; }
+  .employeePage .employeeDetail > .formFields, .employeePage .employeeDetail > .menuEditor, .employeePage .employeeDetail > .inner { padding: 16px; }
+  .employeePage .employeeDetail .formRow > label { width: auto; text-align: left; }
+  .employeePage .employeeDetail > .tabs { position: static; gap: 8px; }
+  .employeePage .employeeDetail > .tabs button { margin-right: 8px; font-size: 13px; }
+  .employeePage .employeeGrid { grid-template-columns: 1fr; }
+  .employeePage .platformGrid { grid-template-columns: 1fr; }
+}
+
+.numberStepper { display: flex; align-items: stretch; border: 1px solid var(--dsw-alias-border-l3); border-radius: 6px; overflow: hidden; }
+.numberStepper button { border-radius: 0; background: var(--dsw-alias-bg-layer-1); padding: 4px 8px; }
+.numberStepper input[type='number'] { border: 0; border-radius: 0; text-align: center; width: 72px; appearance: textfield; }
+.numberStepper input::-webkit-inner-spin-button { appearance: none; }
+
+.footerExample { position: relative; margin-top: 6px; font-size: 12px; color: var(--dsw-alias-brand-primary); }
+.footerExample summary { cursor: pointer; }
+.footerExample img { width: 250px; max-width: 100%; margin-top: 8px; border-radius: 8px; border: 1px solid var(--dsw-alias-border-l3); }
+
+.employeePage [data-form='employeeBase'] .formControl { max-width: 320px; }
+.employeePage [data-form='employeeSearch'] .formControl > select { max-width: 320px; }
+.characterCount { text-align: right; }
+.employeePage .employeeDetail > .inner > .tabs { display: inline-flex; background: var(--dsw-alias-bg-module-platform); padding: 5px; border: 0; border-radius: 12px; }
+.employeePage .employeeDetail > .inner > .tabs button { padding: 10px 24px; border: 0; border-radius: 10px; }
+.employeePage .employeeDetail > .inner > .tabs button[aria-pressed='true'] { background: var(--dsw-alias-brand-primary); color: var(--dsw-alias-label-primary-foreground); }
+.employeePage .table th { background: var(--dsw-alias-bg-layer-1); border: 0; padding: 16px 12px; font-size: 14px; }
+.employeePage .table th:first-child { border-radius: 12px 0 0 12px; }
+.employeePage .table th:last-child { border-radius: 0 12px 12px 0; }
+.employeePage .rowActions { flex-wrap: nowrap; }
+.employeePage .rowActions button { color: var(--dsw-alias-brand-primary); white-space: nowrap; }
+.employeePage .menuEditor { max-width: 800px; }
+
+.menuImages { display: grid; grid-template-columns: 100px minmax(0, 1fr); column-gap: 16px; padding: 20px 0; }
+.menuImages > span { text-align: right; font-size: 13px; padding-top: 6px; }
+.menuImageList { margin: 0; }
+.menuImages > small, .menuImages > p { grid-column: 2; margin-top: 8px; }
+.knowledgeSelect summary { list-style: none; }
+.knowledgeSelect summary::after { content: '⌄'; float: right; color: var(--dsw-alias-label-tertiary); }
+@media (max-width: 500px) { .menuImages { grid-template-columns: 1fr; } .menuImages > span { text-align: left; } .menuImages > small, .menuImages > p { grid-column: 1; } }
+
+.employeePage .menuEditor .pagination { display: none; }
+.usageDetails { margin-top: 24px; color: var(--dsw-alias-label-secondary); }
+.usageDetails summary { cursor: pointer; }

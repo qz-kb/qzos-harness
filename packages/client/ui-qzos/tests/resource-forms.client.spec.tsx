@@ -8,13 +8,15 @@ import { zh, type QzosKey } from '../src/client/locales.ts'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 const t: PropsLocale<'qzos'>['t'] = key => key in zh ? zh[key as QzosKey] : key
 afterEach(cleanup)
-it('offers knowledge creation with no libraries and keeps the conversation model out of the form', () => {
+it('offers knowledge creation with no libraries and labels the backend model separately from the DSH work-window model', () => {
   const create = vi.fn()
   render(<ResourceFields form="employeeCreate" draft={{ name: '员工草稿', roles_prompt: '职责草稿' }} knowledge={[]} onChange={() => {}} onCreateKnowledge={create} t={t} />)
   expect(screen.getByText('还没有可关联的知识库，可以先新建一个。')).toBeDefined()
   fireEvent.click(screen.getByRole('button', { name: '新增知识库' }))
   expect(create).toHaveBeenCalledTimes(1)
-  expect(screen.queryByRole('combobox', { name: '对话模型' })).toBeNull()
+  expect(screen.getByRole('combobox', { name: '后台对话模型' })).toBeDefined()
+  expect(screen.getByText(zh.employeeWindowModel)).toBeDefined()
+  fireEvent.click(screen.getByText('选择可使用的知识库，也可稍后配置'))
   expect((screen.getByRole('textbox', { name: '名称' }) as HTMLInputElement).value).toBe('员工草稿')
   expect(screen.getAllByRole('textbox').map(input => input.getAttribute('placeholder'))).toMatchInlineSnapshot(`
     [
@@ -29,6 +31,7 @@ it('filters authorized libraries and retains selection when searching', () => {
   const change = vi.fn()
   const knowledge = ['制度', '产品'].map((title, i) => ({ id: String(i + 1), title, description: '', category: '', content: '', status: 'ready' as const, scope: 'owned' as const }))
   render(<ResourceFields form="employeeCreate" draft={{ kb_ids: '1' }} knowledge={knowledge} onChange={change} t={t} />)
+  fireEvent.click(screen.getByText('制度', { selector: 'summary' }))
   fireEvent.change(screen.getByRole('textbox', { name: '搜索知识库' }), { target: { value: '产品' } })
   expect(screen.queryByRole('checkbox', { name: '制度' })).toBeNull()
   fireEvent.click(screen.getByRole('checkbox', { name: '产品' }))
@@ -48,4 +51,11 @@ it('allows configured models at creation and keeps only the existing vector mode
   expect((screen.getByRole('combobox', { name: '文件处理模型' }) as HTMLSelectElement).disabled).toBe(false)
   fireEvent.click(screen.getByRole('switch', { name: '允许对外数字员工使用' }))
   expect(change).toHaveBeenCalledWith('external_enabled', '1')
+})
+
+it('blocks linking and nested creation when the account cannot manage the dependency', () => {
+  render(<ResourceFields form="employeeBase" draft={{ kb_ids: '1' }} knowledge={[{ id: '1', title: '制度', category: '', content: '', description: '', status: 'ready' }]} onChange={() => {}} onCreateKnowledge={() => {}} disabledFields={['kb_ids']} t={t} />)
+  fireEvent.click(screen.getByText('制度', { selector: 'summary' }))
+  expect((screen.getByRole('checkbox', { name: '制度' }) as HTMLInputElement).disabled).toBe(true)
+  expect((screen.getByRole('button', { name: '新增知识库' }) as HTMLButtonElement).disabled).toBe(true)
 })

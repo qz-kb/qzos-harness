@@ -126,3 +126,22 @@ it('refreshes legacy queued rows as well as staged incremental learning', () => 
   expect(knowledgeLearningPending({ rows: [], qa: { lists: [{ status: 0 }] } })).toBe(true)
   expect(knowledgeLearningPending({ rows: [{ status: 2 }, { status: 3 }], learning: { pending: false } })).toBe(false)
 })
+
+it('keeps authorized QZOS counters when the optional DSH usage endpoint is unavailable', async () => {
+  const { fetcher } = setup()
+  fetcher.mockImplementation(async url => String(url).includes('/kb.dsh/summary')
+    ? new Response('', { status: 404 }) : reply({ robot: { todayChatCount: 2 }, visitor: { wholeVisitorCount: 1 } }))
+  const ctx = new Context(), registry = new ResourceRegistry(ctx)
+  ctx.reflect.provide('resources', registry)
+  const fiber = ctx.plugin({ apply: (child: Context) => { installKnowledgeResources(child) } })
+  await fiber.await()
+  const stats = registry.source('dsh-resource://qzos-knowledge/employee-stats?id=7')
+  const usage = registry.source('dsh-resource://qzos-knowledge/employee-usage?id=7')
+  const offStats = stats.subscribe(() => {}), offUsage = usage.subscribe(() => {})
+  try {
+    await vi.waitFor(() => { expect(usage.getSnapshot().status).toBe('failed') })
+    expect(stats.getSnapshot()).toMatchObject({ status: 'live', value: { robot: { todayChatCount: 2 } } })
+    expect(fetcher).toHaveBeenCalledTimes(2)
+    expect(fetcher.mock.calls.every(([, init]) => (init?.headers as { token: string }).token === 'business-test')).toBe(true)
+  } finally { offStats(); offUsage(); await fiber.dispose() }
+})
