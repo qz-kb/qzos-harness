@@ -1,6 +1,8 @@
 /** Real transport behavior without contacting external providers. */
 import { afterEach, expect, it, vi } from 'vitest'
-import { readConnections, knowledgeSearchInput, knowledgeRequest, knowledgePages, knowledgeTable, saveKnowledge } from '../src/client/knowledge-client.ts'
+import { Context } from '@deepseek-ai/cordis'
+import { ResourceRegistry } from '../../resources/src/client/resources.ts'
+import { installKnowledgeResources, readConnections, knowledgeSearchInput, knowledgeRequest, knowledgePages, knowledgeTable, saveKnowledge } from '../src/client/knowledge-client.ts'
 import { loginApi, loginSessionKey } from '../src/client/login-client.ts'
 
 function setup() {
@@ -67,4 +69,46 @@ it('keeps authorized connections and history when the market is disabled, but pr
     .mockResolvedValueOnce(new Response(JSON.stringify({ code: -1, msg: 'expired' })))
     .mockResolvedValueOnce(reply([]))
   await expect(readConnections(new AbortController().signal)).rejects.toThrow('expired')
+})
+
+it('retains native catalog cards across navigation, refreshes in place and releases the account', async () => {
+  const { fetcher, values } = setup()
+  fetcher.mockResolvedValue(reply({ lists: [{ id: 1, name: 'first' }], count: 1 }))
+  const ctx = new Context()
+  const registry = new ResourceRegistry(ctx)
+  ctx.reflect.provide('resources', registry)
+  let refresh!: (panel: string) => void
+  const fiber = ctx.plugin({ apply: (child: Context) => { refresh = installKnowledgeResources(child) } })
+  await fiber.await()
+  const account = new AbortController()
+  const address = 'dsh-resource://qzos-knowledge/list?epoch=1&revision=0'
+  const source = registry.source(address)
+  try {
+    registry.pin(address, account.signal)
+    let off = source.subscribe(() => {})
+    await vi.waitFor(() => { expect(source.getSnapshot().status).toBe('live') })
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain('/kb.know/lists')
+    off(); off = source.subscribe(() => {})
+    expect(source.getSnapshot().value).toEqual({ rows: [{ id: 1, name: 'first' }] })
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    let finish: ((value: Response) => void) | undefined
+    fetcher.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+    refresh('knowledge')
+    await vi.waitFor(() => { expect(finish).toBeDefined() })
+    expect(source.getSnapshot()).toMatchObject({ status: 'live', value: { rows: [{ id: 1 }] } })
+    finish!(reply({ lists: [{ id: 2, name: 'updated' }], count: 1 }))
+    await vi.waitFor(() => { expect(source.getSnapshot().value).toEqual({ rows: [{ id: 2, name: 'updated' }] }) })
+    fetcher.mockResolvedValueOnce(new Response(JSON.stringify({ code: 0, msg: 'offline' })))
+    refresh('knowledge')
+    await vi.waitFor(() => { expect(source.getSnapshot().status).toBe('failed') })
+    expect(source.getSnapshot().value).toEqual({ rows: [{ id: 2, name: 'updated' }] })
+    fetcher.mockResolvedValueOnce(new Response(JSON.stringify({ code: -1, msg: 'expired' })))
+    refresh('knowledge')
+    await vi.waitFor(() => { expect(source.getSnapshot().value).toEqual({ rows: [] }) })
+    off(); account.abort(); values.clear()
+    expect(source.getSnapshot().value).toBeUndefined()
+    const next = registry.source('dsh-resource://qzos-knowledge/list?epoch=2&revision=0')
+    expect(next.getSnapshot().value).toBeUndefined()
+  } finally { account.abort(); await fiber.dispose() }
 })

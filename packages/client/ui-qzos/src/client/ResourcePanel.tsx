@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Button, Input, Modal, Tag, Menu, MenuItemButton, IconPlusOutlineRegular, IconUsersOutlineRegular, IconFolderOpenOutlineRegular, IconEllipsisOutlineRegular, IconChevronLeftOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PanelProps } from './Panel.tsx'
 import type { Example } from './catalog.ts'
+import { resourceModelDefaults } from './resource-models.ts'
 import { ResourceFields } from './ResourceForms.tsx'
 import { KnowledgeDetail } from './KnowledgeDetail.tsx'
 import { EmployeeSquare } from './EmployeeSquare.tsx'
@@ -39,7 +40,7 @@ function EmployeeCard({ item, onCommand, labels }: EmployeeCardProps) {
       </Menu>
     </div>
     <div className={css.employeeBody}><div className={css.avatar}>{item.values?.image ? <img src={item.values.image} alt="" /> : <IconUsersOutlineRegular size={24} />}</div><h2>{item.title}</h2><p>{item.description}</p></div>
-    <div className={css.employeeFooter}><Button aria-label={`${labels.settings} · ${item.title}`} onClick={() =>{  onCommand('edit', item) }}>{labels.settings}</Button><Button variant="primary" disabled={item.status !== 'ready'} aria-label={`${labels.chat} · ${item.title}`} onClick={() =>{  onCommand('chat', item) }}>{labels.chat}</Button></div>
+    <div className={css.employeeFooter}><Button aria-label={`${labels.settings} · ${item.title}`} onClick={() =>{  onCommand('edit', item) }}>{labels.settings}</Button><Button disabled={item.status !== 'ready'} aria-label={`${labels.chat} · ${item.title}`} onClick={() =>{  onCommand('chat', item) }}>{labels.chat}</Button></div>
   </article>
 }
 
@@ -51,7 +52,16 @@ export function ResourcePanel(props: ResourcePanelProps) {
   const revision = useStore(state => state.knowledgeRevision)
   const remote = props.useResource<'qzos-knowledge'>(`dsh-resource://qzos-knowledge/${panel === 'knowledge' ? 'list' : 'employees'}?epoch=${epoch}&revision=${revision}`)
   const records = remote.value ? knowledgeRows(remote.value.rows).map(panel === 'knowledge' ? knowledgeCard : employeeCard) : []
-  const models = remote.value ? loginRecord(remote.value.models) : {}
+  const [configuration, setConfiguration] = useState<{ id: string | null } | null>(null)
+  const selected = useStore(state => state.details[panel])
+  const [nestedKnowledge, setNestedKnowledge] = useState<PreviewValues | null>(null)
+  const [nestedKnowledgeId, setNestedKnowledgeId] = useState<string | null>(null)
+  const [createdKnowledge, setCreatedKnowledge] = useState<Example | null>(null)
+  const optionsRemote = props.useResource<'qzos-knowledge'>(configuration || selected ? `dsh-resource://qzos-knowledge/models?epoch=${epoch}&revision=${revision}` : '')
+  const linkedRemote = props.useResource<'qzos-knowledge'>(panel === 'employees' ? `dsh-resource://qzos-knowledge/list?epoch=${epoch}&revision=${revision}` : '')
+  const models = optionsRemote.value ? loginRecord(optionsRemote.value.models) : {}
+  const defaults = resourceModelDefaults(models)
+  useEffect(() => { props.refreshCatalog(panel) }, [panel, props.refreshCatalog])
   const vector = Array.isArray(models.vectorModels) ? knowledgeRows(models.vectorModels) : []
   const rankings = Array.isArray(models.rankingModels) ? knowledgeRows(models.rankingModels) : []
   const modelOptions = {
@@ -78,13 +88,12 @@ export function ResourcePanel(props: ResourcePanelProps) {
     try { await work() } catch (error) { setNotice(error instanceof Error ? error.message : t('errorHint')) }
     finally { pending.current = false; setBusy(false) }
   }
-  const knowledge = remote.value && Array.isArray(remote.value.knowledge) ? knowledgeRows(remote.value.knowledge).map(knowledgeCard) : []
+  const knowledge = linkedRemote.value ? knowledgeRows(linkedRemote.value.rows).map(knowledgeCard) : []
+  if (createdKnowledge && !knowledge.some(item => item.id === createdKnowledge.id)) knowledge.push(createdKnowledge)
   const filter = useStore(state => state.filters[panel] ?? (panel === 'knowledge' ? 'owned' : 'all'))
   const query = useStore(state => state.queries[panel] ?? '')
-  const selected = useStore(state => state.details[panel])
   const section = useStore(state => state.sections[panel] ?? (panel === 'knowledge' ? 'dataStudy' : 'edit'))
   const [search, setSearch] = useState(query)
-  const [configuration, setConfiguration] = useState<{ id: string | null } | null>(null)
   const [draft, setDraft] = useState<PreviewValues>({})
   const [deleting, setDeleting] = useState<Example | null>(null)
   const [notice, setNotice] = useState('')
@@ -93,7 +102,7 @@ export function ResourcePanel(props: ResourcePanelProps) {
   const configure = (record?: Example) => {
     if (panel === 'knowledge') {
       void perform(async () => {
-        const values = record ? knowledgeDraft(loginRecord(await knowledgeRequest(`/kb.know/detail?id=${record.id}`))) : { name: '', intro: '', image: '', embedding_model_id: '', documents_model_id: '' }
+        const values = record ? knowledgeDraft(loginRecord(await knowledgeRequest(`/kb.know/detail?id=${record.id}`))) : { name: '', intro: '', image: '' }
         if (record) values.documents_model_id = `${values.documents_model_id}:${values.documents_model_sub_id}`
         setDraft(values); setConfiguration({ id: record?.id ?? null })
       }); return
@@ -117,33 +126,32 @@ export function ResourcePanel(props: ResourcePanelProps) {
     : [['edit', 'employeeSettings'], ['release', 'employeeRelease'], ['dialogue', 'dialogue'], ['chat', 'immediateChat']]
   const save = () => {
     if (!configuration || !draft.name?.trim()) return
-    if (panel === 'knowledge') { void perform(async () => { await saveKnowledge(configuration.id, draft, lifetime.signal); actions.refreshKnowledge(); setConfiguration(null); setNotice(r('saved')) }); return }
+    if (panel === 'knowledge') { void perform(async () => { await saveKnowledge(configuration.id, { ...defaults, ...draft }, lifetime.signal); actions.refreshKnowledge(); setConfiguration(null); setNotice(r('saved')) }); return }
     void perform(async () => {
       const image = await employeeImage(draft.image ?? '', lifetime.signal, credential.current)
-      if (!draft.model_id?.includes(':')) throw new Error(t('employeeModelRequired'))
       const result = configuration.id ? { id: configuration.id } : loginRecord(await knowledgeRequest('/kb.robot/add', { name: draft.name, intro: draft.intro ?? '', ...image ? { image } : {} }))
       const id = knowledgeText(result.id)
       if (!id) throw new Error(t('employeeWriteUnknown'))
       setConfiguration({ id }); actions.refreshKnowledge()
       const detail = loginRecord(await knowledgeRequest(`/kb.robot/detail?id=${id}`))
-      const fullDraft = { ...employeeDraft(detail), ...draft, image: image || knowledgeText(detail.image) }
+      const fullDraft = { ...employeeDraft(detail), ...draft, ...defaults, model_id: employeeDraft(detail).model_id ?? '0:0', image: image || knowledgeText(detail.image) }
       await saveEmployee(detail, fullDraft, knowledgeRows(detail.menus), lifetime.signal)
       actions.refreshKnowledge(); setConfiguration(null); actions.setDetail(panel, id); actions.setSection(panel, 'edit'); setNotice(t('kbSaved'))
     })
   }
   return <section className={css.page} data-qzos-panel={panel}>
     {square && <EmployeeSquare {...props} onClose={() => { setSquare(false) }} />}
-    {panel === 'employees' && <Button onClick={() => { setSquare(true) }}>{t('employeeSquare')}</Button>}
-    {remote.status === 'loading' && <p role="status">{t(panel === 'employees' ? 'employeeLoading' : 'kbLoading')}</p>}
     {remote.status === 'failed' && <p role="alert">{remote.failure?.message}<Button onClick={() =>{  actions.refreshKnowledge() }}>{r('refresh')}</Button></p>}
     {!item ? <>
       <header className={css.listHead}>
         {panel === 'knowledge' ? <div className={css.tabs}>{(['owned', 'shared'] as const).map(scope => <Button key={scope} aria-pressed={filter === scope} onClick={() =>{  actions.setFilter(panel, scope) }}>{r(scope === 'owned' ? 'mine' : 'shared')}</Button>)}</div>
-          : <><h1>{r('employees')}</h1><div className={css.inline}><span>{r('filter')}</span><select aria-label={t('scope')} value={filter} onChange={(event) =>{  actions.setFilter(panel, event.target.value) }}>{(['all', 'public', 'private'] as const).map(scope => <option key={scope} value={scope}>{r(scope)}</option>)}</select><Input aria-label={r('searchEmployee')} placeholder={r('searchEmployee')} value={search} onChange={(event) =>{  setSearch(event.target.value) }} onKeyDown={(event) => { if (event.key === 'Enter') actions.setQuery(panel, search) }} /><Button variant="primary" onClick={() =>{  actions.setQuery(panel, search) }}>{r('search')}</Button></div></>}
+          : <><h1>{r('employees')}</h1><Button onClick={() => { setSquare(true) }}>{t('employeeSquare')}</Button><div className={css.inline}><span>{r('filter')}</span><select aria-label={t('scope')} value={filter} onChange={(event) =>{  actions.setFilter(panel, event.target.value) }}>{(['all', 'public', 'private'] as const).map(scope => <option key={scope} value={scope}>{r(scope)}</option>)}</select><Input aria-label={r('searchEmployee')} placeholder={r('searchEmployee')} value={search} onChange={(event) =>{  setSearch(event.target.value) }} onKeyDown={(event) => { if (event.key === 'Enter') actions.setQuery(panel, search) }} /><Button variant="primary" onClick={() =>{  actions.setQuery(panel, search) }}>{r('search')}</Button></div></>}
       </header>
+      <div className={css.listRefresh}><Button aria-label={r('refresh')} onClick={() => { props.refreshCatalog(panel) }}>{r('refresh')}</Button></div>
       {notice && <p className={css.notice} role="status">{notice}</p>}
       {panel === 'knowledge' ? <div className={css.kbGrid}>
         {filter === 'owned' && <button className={css.kbCreate} type="button" onClick={() =>{  configure() }}><IconPlusOutlineRegular size={24} />{r('newKnowledge')}</button>}
+        {!remote.value && remote.status === 'loading' && <div className={css.cardSkeleton} role="status" aria-label={t('catalogLoading')} />}
         {filtered.map(record => <article className={css.kbCard} key={record.id}>
           <div className={css.kbCover}>
             <button type="button" className={css.kbCoverButton} aria-label={`${t('detail')} · ${record.title}`} onClick={() =>{  open(record, 'dataStudy') }}>{record.values?.image ? <img src={record.values.image} alt="" /> : <IconFolderOpenOutlineRegular size={32} />}</button>
@@ -154,6 +162,7 @@ export function ResourcePanel(props: ResourcePanelProps) {
         </article>)}
       </div> : <div className={css.employeeGrid}>
         <button className={css.employeeCreate} type="button" onClick={() =>{  configure() }}><IconPlusOutlineRegular size={24} />{r('newEmployee')}</button>
+        {!remote.value && remote.status === 'loading' && <div className={css.cardSkeleton} role="status" aria-label={t('catalogLoading')} />}
         {filtered.map(record => <EmployeeCard key={record.id} item={record} onCommand={employeeCommand} labels={{ public: r('public'), private: r('private'), more: r('more'), settings: r('settings'), chat: r('chat'), publish: r('publishEmployee'), dialogue: r('dialogue'), delete: r('delete') }} />)}
       </div>}
       {filtered.length === 0 && remote.status === 'live' && <p className={css.empty}>{r('empty')}</p>}
@@ -168,12 +177,28 @@ export function ResourcePanel(props: ResourcePanelProps) {
         ? <KnowledgeDetail key={`${item.id}:${section}`} {...props} item={item} section={section} onDelete={() =>{  setDeleting(item) }} modelOptions={modelOptions} />
         : <EmployeeDetail key={`${item.id}:${section}`} {...props} item={item} section={section} knowledge={knowledge} modelOptions={{ ...modelOptions, model_id: modelOptions.documents_model_id, optimize_m_id: modelOptions.documents_model_id }} onSaved={() => { actions.refreshKnowledge() }} />}</div>
     </div>}
-    <Modal open={configuration !== null} onClose={() =>{  setConfiguration(null) }} closeLabel={r('close')} className={(panel === 'knowledge' ? css.knowledgeDialog : `${css.dialog} ${css.employeeDialog}`) as string}
+    <Modal open={configuration !== null && nestedKnowledge === null} onClose={() =>{ if (!busy) setConfiguration(null) }} closeLabel={r('close')} className={(panel === 'knowledge' ? css.knowledgeDialog : `${css.dialog} ${css.employeeDialog}`) as string}
       title={panel === 'knowledge' ? configuration?.id === null ? r('newKnowledge') : r('editKnowledge') : r('newEmployeeTitle')}
-      footer={<><Button variant="outline" onClick={() =>{  setConfiguration(null) }}>{r(panel === 'knowledge' ? 'return' : 'cancel')}</Button><Button variant="primary" disabled={busy} form="qzos-resource-form" type="submit">{r(panel === 'knowledge' ? 'save' : 'createConfigure')}</Button></>}>
+      footer={<><Button variant="outline" disabled={busy} onClick={() =>{  setConfiguration(null) }}>{r(panel === 'knowledge' ? 'return' : 'cancel')}</Button><Button variant="primary" disabled={busy || optionsRemote.status !== 'live'} form="qzos-resource-form" type="submit">{r(panel === 'knowledge' ? 'save' : 'createConfigure')}</Button></>}>
       {notice && <p role="alert">{notice}</p>}
-      {panel === 'knowledge' && (!modelOptions.embedding_model_id.some(option => !option.disabled) || !modelOptions.documents_model_id.some(option => !option.disabled)) && <p role="status">{t('kbModelsRequired')}</p>}
-      <form id="qzos-resource-form" onSubmit={(event) => { event.preventDefault(); save() }}><ResourceFields t={t} form={panel === 'knowledge' ? 'knowledgeCreate' : 'employeeCreate'} draft={draft} options={panel === 'knowledge' ? modelOptions : { ...modelOptions, model_id: modelOptions.documents_model_id }} disabled={busy} editing={configuration?.id !== null} onChange={(key, value) =>{  setDraft(current => ({ ...current, [key]: value })) }} knowledge={knowledge} /></form>
+      {optionsRemote.status === 'failed' && <p role="alert">{optionsRemote.failure?.message}<Button onClick={() => { actions.refreshKnowledge() }}>{r('refresh')}</Button></p>}
+      {panel === 'employees' && <p className={css.notice}>{t('employeeLocalModel')}</p>}
+      {panel === 'knowledge' && optionsRemote.status === 'live' && (!modelOptions.embedding_model_id.some(option => !option.disabled) || !modelOptions.documents_model_id.some(option => !option.disabled)) && <p role="status">{t('kbModelsRequired')}</p>}
+      <form id="qzos-resource-form" onSubmit={(event) => { event.preventDefault(); save() }}><ResourceFields t={t} form={panel === 'knowledge' ? 'knowledgeCreate' : 'employeeCreate'} draft={panel === 'knowledge' ? { ...defaults, ...draft } : draft} options={panel === 'knowledge' ? modelOptions : { ...modelOptions, model_id: modelOptions.documents_model_id }} disabled={busy} editing={configuration?.id !== null} onChange={(key, value) =>{  setDraft(current => ({ ...current, [key]: value })) }} knowledge={knowledge} knowledgeLoading={linkedRemote.status === 'loading'} knowledgeError={linkedRemote.failure?.message} onCreateKnowledge={panel === 'employees' ? () => { setNestedKnowledgeId(null); setNestedKnowledge({ name: '', intro: '', image: '' }); setNotice('') } : undefined} /></form>
+    </Modal>
+    <Modal open={nestedKnowledge !== null} onClose={() => { if (!busy) setNestedKnowledge(null) }} closeLabel={r('close')} className={css.knowledgeDialog as string} title={r('newKnowledge')}
+      footer={<><Button disabled={busy} onClick={() => { setNestedKnowledge(null) }}>{t('backToEmployee')}</Button><Button variant="primary" disabled={busy || optionsRemote.status !== 'live'} form="qzos-linked-knowledge-form" type="submit">{t('createAndLink')}</Button></>}>
+      {notice && <p role="alert">{notice}</p>}
+      {optionsRemote.status === 'failed' && <p role="alert">{optionsRemote.failure?.message}<Button onClick={() => { actions.refreshKnowledge() }}>{r('refresh')}</Button></p>}
+      <form id="qzos-linked-knowledge-form" onSubmit={(event) => { event.preventDefault(); if (!nestedKnowledge) return; const values = { ...defaults, ...nestedKnowledge }; void perform(async () => {
+        const id = nestedKnowledgeId ?? await saveKnowledge(null, values, lifetime.signal)
+        if (!id) throw new Error(t('employeeWriteUnknown'))
+        setNestedKnowledgeId(id)
+        const created = knowledgeCard(loginRecord(await knowledgeRequest(`/kb.know/detail?id=${encodeURIComponent(id)}`)))
+        setCreatedKnowledge(created)
+        setDraft(current => ({ ...current, kb_ids: [...new Set([...(current.kb_ids ?? '').split(',').filter(Boolean), id])].join(',') }))
+        props.refreshCatalog('knowledge'); setNestedKnowledge(null); setNotice(t('knowledgeLinked'))
+      }) }}><ResourceFields t={t} form="knowledgeCreate" draft={{ ...defaults, ...nestedKnowledge }} options={modelOptions} disabled={busy || nestedKnowledgeId !== null || optionsRemote.status !== 'live'} onChange={(key, value) => { setNestedKnowledge(current => ({ ...current, [key]: value })) }} knowledge={[]} /></form>
     </Modal>
     <Modal open={deleting !== null} onClose={() =>{  setDeleting(null) }} closeLabel={r('close')} title={r('deleteConfirm')} description={r('deleteHint')}
       footer={<><Button variant="outline" onClick={() =>{  setDeleting(null) }}>{r('cancel')}</Button><Button variant="primary" onClick={() => { if (deleting) { const id = deleting.id; void perform(async () => { await knowledgeRequest(panel === 'knowledge' ? '/kb.know/del' : '/kb.robot/del', { id: Number(id) }); actions.setDetail(panel, null); actions.refreshKnowledge(); if (panel === 'employees') syncEmployees(records.filter(record => record.id !== id)); setDeleting(null) }) } }}>{r('confirmDelete')}</Button></>}><strong>{deleting?.title}</strong>{notice && <p role="alert">{notice}</p>}</Modal>

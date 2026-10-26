@@ -89,8 +89,10 @@ export async function readConnections(signal: AbortSignal): Promise<LoginRecord>
 }
 /** Register API reads under the framework resource lifecycle; refresh changes the address revision.
  * @param ctx - Plugin context owning resource registration.
+ * @returns Refresh a retained catalog without discarding its current cards.
  */
-export function installKnowledgeResources(ctx: Context): void {
+export function installKnowledgeResources(ctx: Context): (panel: string) => void {
+  const refreshes = new EventTarget()
   ctx.effect(() => ctx.resources.register<'qzos-knowledge'>({
     protocol: 'qzos-knowledge',
     async *open(address, { signal }) {
@@ -99,16 +101,30 @@ export function installKnowledgeResources(ctx: Context): void {
         const id = url.searchParams.get('id') ?? ''
         const fd = url.searchParams.get('fd') ?? ''
         let value: LoginRecord
-        switch (url.pathname.slice(1)) {
+        const kind = url.pathname.slice(1)
+        if (kind === 'list' || kind === 'employees') {
+          do {
+            try {
+              const rows = await knowledgePages(kind === 'list' ? '/kb.know/lists?type=0' : '/kb.robot/lists', signal)
+              if (signal.aborted) return
+              yield { ok: true as const, value: { rows } }
+            } catch (error) {
+              if (signal.aborted) return
+              if (error instanceof LoginError && [-1, -2].includes(error.code)) yield { ok: true as const, value: { rows: [] } }
+              yield { ok: false as const, error: Object.assign(new Error(error instanceof Error ? error.message : 'QZOS request failed'), { code: 'gateway/internal' as const, details: {}, isDSHRemoteError: true as const }) }
+            }
+            await new Promise<void>((resolve) => {
+              const resume = () => { refreshes.removeEventListener(kind, resume); signal.removeEventListener('abort', resume); resolve() }
+              refreshes.addEventListener(kind, resume, { once: true })
+              signal.addEventListener('abort', resume, { once: true })
+              if (signal.aborted) resume()
+            })
+          } while (!signal.aborted)
+          return
+        }
+        switch (kind) {
           case 'product-updates': value = loginRecord(await knowledgeRequest(`/productUpdate/overview?surface=${qzosSurface()}&version=${qzosClientVersion}&check=${Number(url.searchParams.get('revision') ?? 0) > 0 ? 1 : 0}`, undefined, signal)); break
-          case 'list': {
-            const [rows, models] = await Promise.all([knowledgePages('/kb.know/lists?type=0', signal), knowledgeRequest('/index/models', undefined, signal)])
-            value = { rows, models }; break
-          }
-          case 'employees': {
-            const [rows, models, knowledge] = await Promise.all([knowledgePages('/kb.robot/lists', signal), knowledgeRequest('/index/models', undefined, signal), knowledgePages('/kb.know/lists?type=0', signal)])
-            value = { rows, models, knowledge }; break
-          }
+          case 'models': value = { models: loginRecord(await knowledgeRequest('/index/models', undefined, signal)) }; break
           case 'employee-square': {
             const [categories, page, used] = await Promise.all([
               knowledgeRequest('/kb.square/category', undefined, signal),
@@ -196,6 +212,7 @@ export function installKnowledgeResources(ctx: Context): void {
       }
     },
   }), 'qzos knowledge API resources')
+  return (panel) => { refreshes.dispatchEvent(new Event(panel === 'knowledge' ? 'list' : panel)) }
 }
 /** Map server cards to existing presentation fields, without synthetic counts or permissions.
  * @param row - Server record.
@@ -225,8 +242,9 @@ export function knowledgeTable(rows: LoginRecord[], kind: 'files' | 'fragments' 
  * @param id - Existing knowledge ID, or null to create.
  * @param draft - Current form fields.
  * @param signal - Caller cancellation signal.
+ * @returns Saved knowledge identity for returning to an employee draft.
  */
-export async function saveKnowledge(id: string | null, draft: PreviewValues, signal?: AbortSignal): Promise<void> {
+export async function saveKnowledge(id: string | null, draft: PreviewValues, signal?: AbortSignal): Promise<string> {
   const token = storedLogin(sessionStorage)
   let image = draft.image ?? ''
   if (image.startsWith('data:')) {
@@ -234,7 +252,8 @@ export async function saveKnowledge(id: string | null, draft: PreviewValues, sig
     const form = new FormData(); form.append('file', blob, `cover.${blob.type.split('/')[1] ?? 'png'}`)
     const uploaded = loginRecord(await knowledgeRequest('/upload/image', form, signal, token)); image = knowledgeText(uploaded.uri ?? uploaded.url ?? '')
   }
-  await knowledgeRequest(`/kb.know/${id ? 'edit' : 'add'}`, { ...id ? { id: Number(id) } : { embedding_model_id: Number(draft.embedding_model_id) }, name: draft.name, intro: draft.intro, image, documents_model_id: Number(draft.documents_model_id?.split(':')[0]), documents_model_sub_id: Number(draft.documents_model_id?.split(':')[1] ?? draft.documents_model_sub_id) }, signal, token)
+  const result = await knowledgeRequest(`/kb.know/${id ? 'edit' : 'add'}`, { ...id ? { id: Number(id) } : { embedding_model_id: Number(draft.embedding_model_id) }, name: draft.name, intro: draft.intro, image, documents_model_id: Number(draft.documents_model_id?.split(':')[0]), documents_model_sub_id: Number(draft.documents_model_id?.split(':')[1] ?? draft.documents_model_sub_id) }, signal, token)
+  return id ?? knowledgeText(loginRecord(result).id)
 }
 
 /** Translate form controls to the existing retrieval API contract.

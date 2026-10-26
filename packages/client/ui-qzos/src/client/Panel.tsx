@@ -14,6 +14,7 @@ type Copy = PropsLocale<'qzos'>
 type View = PropsStore<ReturnType<typeof createQzosStore>>
 export type PanelProps = Copy & View & Pick<PropsRuntime<'main'>, 'useResource'> & {
   panel: Panel
+  refreshCatalog: (panel: string) => void
   developer: boolean
   openEmployee: (id: string, title?: string) => Promise<string | undefined>
   syncEmployees: (employees: readonly Example[]) => void

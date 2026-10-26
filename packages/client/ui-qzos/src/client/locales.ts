@@ -1,5 +1,18 @@
 /** Localized controls for QZOS resource previews. */
 export const zh = {
+  catalogLoading: '加载中',
+  searchKnowledge: '搜索知识库',
+  noKnowledgeToLink: '还没有可关联的知识库，可以先新建一个。',
+  backToEmployee: '返回创建员工',
+  createAndLink: '创建并关联',
+  knowledgeLinked: '知识库已创建并选中，继续完善员工配置。',
+  employeeLocalModel: '对话模型在工作窗口中配置；知识检索默认使用后台配置的向量和重排模型。',
+  backendModelDefault: '默认使用后台配置的可用模型。',
+  employeeNamePlaceholder: '例如：制度问答专员',
+  employeeIntroPlaceholder: '查制度，附出处',
+  employeeRolePlaceholder: '说明负责的工作，以及找不到依据时如何回答。',
+  knowledgeNamePlaceholder: '请输入知识库名称',
+  knowledgeIntroPlaceholder: '请用一句话描述知识库',
   updatesAvailable: '服务可更新', updatesCheckUnavailable: '暂时无法检查新版本，以下为已安装包中的更新日志。',
   updatesTitle: '更新日志',
   updatesNew: '本次更新内容已就绪',
@@ -615,6 +628,19 @@ export const zh = {
 } satisfies Record<string, string>
 export type QzosKey = keyof typeof zh
 export const en: Record<QzosKey, string> = {
+  catalogLoading: 'Loading',
+  searchKnowledge: 'Search knowledge bases',
+  noKnowledgeToLink: 'No knowledge bases available. Create one to link it.',
+  backToEmployee: 'Back to employee',
+  createAndLink: 'Create and link',
+  knowledgeLinked: 'Knowledge base created and selected. Continue configuring the employee.',
+  employeeLocalModel: 'Configure the conversation model in the work window. Retrieval defaults to the backend embedding and reranking models.',
+  backendModelDefault: 'Uses the available backend default model.',
+  employeeNamePlaceholder: 'For example: Policy assistant',
+  employeeIntroPlaceholder: 'Find policies with sources',
+  employeeRolePlaceholder: 'Describe responsibilities and how to answer when sources are unavailable.',
+  knowledgeNamePlaceholder: 'Knowledge base name',
+  knowledgeIntroPlaceholder: 'Describe this knowledge base in one sentence',
   updatesAvailable: 'Server update available', updatesCheckUnavailable: 'Update check unavailable. Showing installed release notes.',
   updatesTitle: 'Release notes',
   updatesNew: 'See what changed',
