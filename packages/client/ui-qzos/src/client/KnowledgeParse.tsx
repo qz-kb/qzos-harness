@@ -17,7 +17,7 @@ export function KnowledgeParse(props: ParseProps) {
   const [revision, setRevision] = useState(0)
   const remote = useResource<'qzos-knowledge'>(`dsh-resource://qzos-knowledge/parse?id=${kb}&fd=${fd}&epoch=${epoch}&revision=${revision}`)
   const refresh = () => { setRevision(value => value + 1); props.onChanged() }
-  return <Modal open onClose={onClose} title={`${t('parseTitle')} · ${name}`} closeLabel={t('loginClose')} className={css.dialog as string} footer={<Button onClick={onClose}>{t('loginClose')}</Button>}>
+  return <Modal open onClose={onClose} title={`${t('parseTitle')} · ${name}`} closeLabel={t('loginClose')} className={`${css.aclDialog} ${css.knowledgeTheme}`} footer={<Button onClick={onClose}>{t('loginClose')}</Button>}>
     {remote.status === 'failed' ? <p role="alert">{remote.failure?.message}<Button onClick={refresh}>{t('parseRefresh')}</Button></p>
       : !remote.value ? <p role="status">{t('kbLoading')}</p>
         : <ParseContent key={`${epoch}:${revision}`} {...props} value={remote.value} refresh={refresh} />}

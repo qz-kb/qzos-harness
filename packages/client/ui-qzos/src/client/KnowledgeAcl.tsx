@@ -12,6 +12,7 @@ export function KnowledgeAcl({ fd, onClose, ...props }: PanelProps & { fd: strin
   const epoch = useStore(state => state.businessEpoch)
   const [revision, setRevision] = useState(0)
   const [draft, setDraft] = useState<LoginRecord>({ allow_mask: 0, deny_mask: 0, is_active: 1 })
+  const [editing, setEditing] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const pending = useRef(false)
@@ -24,31 +25,41 @@ export function KnowledgeAcl({ fd, onClose, ...props }: PanelProps & { fd: strin
   const options = Object.entries(subjects).flatMap(([type, entries]) => knowledgeRows(entries).map(row => ({ value: `${type}:${knowledgeText(row.id)}`, name: knowledgeText(row.name) })))
   const subject = draft.subject_type ? `${knowledgeText(draft.subject_type)}:${knowledgeText(draft.subject_id)}` : ''
   const change = (patch: LoginRecord) => { setDraft(current => ({ ...current, ...patch })) }
-  const mutate = async (remove = false) => {
+  const mutate = async (remove = false, target = draft) => {
     if (pending.current) return
     pending.current = true; setBusy(true); setError('')
     try {
-      await knowledgeRequest(`/kb.documentAcl/${remove ? 'del' : draft.id ? 'edit' : 'add'}`, remove ? { id: Number(draft.id) } : {
-        ...draft.id ? { id: Number(draft.id) } : { fd_id: Number(fd) },
-        subject_type: Number(draft.subject_type), subject_id: Number(draft.subject_id),
-        allow_mask: Number(draft.allow_mask), deny_mask: Number(draft.deny_mask), is_active: Number(draft.is_active),
-        include_descendants: Number(draft.include_descendants ?? 0),
+      await knowledgeRequest(`/kb.documentAcl/${remove ? 'del' : target.id ? 'edit' : 'add'}`, remove ? { id: Number(target.id) } : {
+        ...target.id ? { id: Number(target.id) } : { fd_id: Number(fd) },
+        subject_type: Number(target.subject_type), subject_id: Number(target.subject_id),
+        allow_mask: Number(target.allow_mask), deny_mask: Number(target.deny_mask), is_active: Number(target.is_active),
+        include_descendants: Number(target.include_descendants ?? 0),
       }, lifetime.signal, token.current)
-      setDraft({ allow_mask: 0, deny_mask: 0, is_active: 1 }); setRevision(value => value + 1)
+      setDraft({ allow_mask: 0, deny_mask: 0, is_active: 1 }); setRevision(value => value + 1); setEditing(false)
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('errorHint')) }
     finally { pending.current = false; setBusy(false) }
   }
   const permissions = [[1, 'aclView'], [2, 'aclReference'], [4, 'aclDownload'], [8, 'aclEdit'], [16, 'aclDelete']] as const
-  return <Modal open onClose={onClose} title={t('aclSubject')} closeLabel={t('loginClose')} className={css.dialog as string} footer={<Button onClick={onClose}>{t('loginClose')}</Button>}>
+  return <Modal open onClose={onClose} title={t('pc118')} closeLabel={t('loginClose')} className={`${css.aclDialog} ${css.knowledgeTheme}`} footer={<Button onClick={onClose}>{t('loginClose')}</Button>}>
+    <p className={css.notice}>{t('knowledgeAclHint')}</p>
     {remote.status === 'failed' && <p role="alert">{remote.failure?.message}</p>}
     {error && <p role="alert">{error}</p>}
     {!remote.value ? <p role="status">{t('kbLoading')}</p> : <div className={css.formFields}>
-      <div className={css.inline}>{rows.map(row => <Button key={knowledgeText(row.id)} disabled={busy} onClick={() => { setDraft(row); setError('') }}>{knowledgeText(row.subject_name)} · {knowledgeText(row.id)} · {Number(row.is_active) === 1 ? t('aclActive') : t('aclInactive')}</Button>)}<Button disabled={busy} onClick={() => { setDraft({ allow_mask: 0, deny_mask: 0, is_active: 1 }) }}>{t('aclAdd')}</Button></div>
-      <label>{t('aclSubject')}<select disabled={busy} value={subject} onChange={(event) => { const [type, id] = event.target.value.split(':'); change({ subject_type: Number(type), subject_id: Number(id) }) }}><option value="">—</option>{subject && !options.some(option => option.value === subject) && <option value={subject}>{knowledgeText(draft.subject_name)}</option>}{options.map(option => <option key={option.value} value={option.value}>{option.name} ({option.value})</option>)}</select></label>
-      {permissions.map(([bit, label]) => <label key={bit}>{t(label)}<select disabled={busy} value={Number(draft.deny_mask) & bit ? 'deny' : Number(draft.allow_mask) & bit ? 'allow' : 'neutral'} onChange={(event) => { change({ allow_mask: (Number(draft.allow_mask) & ~bit) | (event.target.value === 'allow' ? bit : 0), deny_mask: (Number(draft.deny_mask) & ~bit) | (event.target.value === 'deny' ? bit : 0) }) }}><option value="neutral">{t('aclNeutral')}</option><option value="allow">{t('aclAllow')}</option><option value="deny">{t('aclDeny')}</option></select></label>)}
-      <label><input type="checkbox" disabled={busy} checked={Number(draft.is_active) === 1} onChange={(event) => { change({ is_active: event.target.checked ? 1 : 0 }) }} />{t('aclActive')}</label>
-      {Number(draft.subject_type) === 2 && <label><input type="checkbox" disabled={busy} checked={Number(draft.include_descendants) === 1} onChange={(event) => { change({ include_descendants: event.target.checked ? 1 : 0 }) }} />{t('aclDescendants')}</label>}
-      <div className={css.formFooter}><Button disabled={busy || !subject} variant="primary" onClick={() => { void mutate() }}>{t('aclSave')}</Button>{Boolean(draft.id) && <Button disabled={busy} onClick={() => { void mutate(true) }}>{t('aclDelete')}</Button>}</div>
+      <div className={css.toolbar}><strong>{t('knowledgeRules')}</strong><Button variant="primary" disabled={busy} onClick={() => { setDraft({ allow_mask: 0, deny_mask: 0, is_active: 1 }); setEditing(true) }}>{t('aclAdd')}</Button></div>
+      <div className={css.tableWrap}><table className={css.table}><thead><tr><th>{t('knowledgeRuleSubject')}</th><th>{t('aclAllow')}</th><th>{t('aclDeny')}</th><th>{t('aclDescendants')}</th><th>{t('knowledgeRuleStatus')}</th><th>{t('pc113')}</th></tr></thead><tbody>
+        {rows.map(row => <tr key={knowledgeText(row.id)}><td>{knowledgeText(row.subject_name) || knowledgeText(row.subject_id)}</td>
+          {[row.allow_mask, row.deny_mask].map((mask, index) => <td key={index}>{permissions.filter(([bit]) => Number(mask) & bit).map(([, label]) => t(label)).join('、') || '—'}</td>)}
+          <td>{Number(row.subject_type) === 2 && Number(row.include_descendants) === 1 ? t('knowledgeEnabled') : '—'}</td><td>{Number(row.is_active) === 1 ? t('aclActive') : t('aclInactive')}</td>
+          <td><div className={css.rowActions}><Button disabled={busy} onClick={() => { setDraft(row); setEditing(true); setError('') }}>{t('editKnowledge')}</Button><Button disabled={busy || Number(row.is_active) !== 1} onClick={() => { void mutate(true, row) }}>{t('aclDelete')}</Button></div></td>
+        </tr>)}
+      </tbody></table>{!rows.length && <p className={css.empty}>{t('empty')}</p>}</div>
+      {editing && <>
+        <label>{t('aclSubject')}<select disabled={busy} value={subject} onChange={(event) => { const [type, id] = event.target.value.split(':'); change({ subject_type: Number(type), subject_id: Number(id) }) }}><option value="">—</option>{subject && !options.some(option => option.value === subject) && <option value={subject}>{knowledgeText(draft.subject_name)}</option>}{options.map(option => <option key={option.value} value={option.value}>{option.name} ({option.value})</option>)}</select></label>
+        {permissions.map(([bit, label]) => <label key={bit}>{t(label)}<select disabled={busy} value={Number(draft.deny_mask) & bit ? 'deny' : Number(draft.allow_mask) & bit ? 'allow' : 'neutral'} onChange={(event) => { change({ allow_mask: (Number(draft.allow_mask) & ~bit) | (event.target.value === 'allow' ? bit : 0), deny_mask: (Number(draft.deny_mask) & ~bit) | (event.target.value === 'deny' ? bit : 0) }) }}><option value="neutral">{t('aclNeutral')}</option><option value="allow">{t('aclAllow')}</option><option value="deny">{t('aclDeny')}</option></select></label>)}
+        <label><input type="checkbox" disabled={busy} checked={Number(draft.is_active) === 1} onChange={(event) => { change({ is_active: event.target.checked ? 1 : 0 }) }} />{t('aclActive')}</label>
+        {Number(draft.subject_type) === 2 && <label><input type="checkbox" disabled={busy} checked={Number(draft.include_descendants) === 1} onChange={(event) => { change({ include_descendants: event.target.checked ? 1 : 0 }) }} />{t('aclDescendants')}</label>}
+        <div className={css.formFooter}><Button disabled={busy || !subject} variant="primary" onClick={() => { void mutate() }}>{t('aclSave')}</Button><Button disabled={busy} onClick={() => { setEditing(false) }}>{t('pc88')}</Button></div>
+      </>}
     </div>}
   </Modal>
 }

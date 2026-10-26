@@ -17,7 +17,8 @@ export function resourceModelDefaults(models: LoginRecord): PreviewValues {
     row.is_ready !== false && Array.isArray(row.models) && knowledgeRows(row.models).some(child => child.is_ready !== false),
   ) : []
   const chat = chats.find(row => Number(row.is_default) === 1) ?? chats[0]
-  const child = chat ? knowledgeRows(chat.models).find(row => row.is_ready !== false) : undefined
+  const children = chat ? knowledgeRows(chat.models).filter(row => row.is_ready !== false) : []
+  const child = children.find(row => Number(row.is_default) === 1) ?? children[0]
   return {
     embedding_model_id: vector ? knowledgeText(vector.id) : '',
     documents_model_id: chat && child ? `${knowledgeText(chat.id)}:${knowledgeText(child.id)}` : '',
