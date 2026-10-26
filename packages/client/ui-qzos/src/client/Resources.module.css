@@ -11,13 +11,13 @@
 .listHead .tabs { padding: 0; border: 0; gap: 8px; }
 .badge { font-size: 11px; color: var(--dsw-alias-label-tertiary); margin-left: auto; }
 .kbGrid { display: flex; flex-wrap: wrap; align-items: stretch; gap: 16px; padding: 0 28px 28px; }
-.kbCard, .kbCreate { box-sizing: border-box; width: 232px; min-height: 224px; flex: none; background: var(--dsw-alias-bg-base); border: 1px solid var(--dsw-alias-border-l3); border-radius: 12px; overflow: hidden; }
-.kbCreate { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; border-style: dashed; color: var(--dsw-alias-label-secondary); background: transparent; font: inherit; cursor: pointer; }
-.kbCover { height: 88px; position: relative; background: var(--dsw-alias-bg-layer-1); margin: 12px 12px 0; border-radius: 8px; overflow: hidden; }
+.kbCard, .kbCreate { box-sizing: border-box; width: 200px; min-height: 224px; flex: none; background: var(--dsw-alias-bg-base); border: 1px solid var(--dsw-alias-border-l3); border-radius: 12px; overflow: hidden; }
+.kbCreate { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--dsw-alias-label-secondary); background: var(--dsw-alias-bg-base); font: inherit; cursor: pointer; }
+.kbCover { height: 160px; position: relative; background: var(--dsw-alias-bg-layer-1); margin: 0; border-radius: 0; overflow: hidden; }
 .kbCoverButton { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; border: 0; color: var(--dsw-alias-label-tertiary); background: transparent; cursor: pointer; }
 .kbCover img { width: 100%; height: 100%; object-fit: cover; }
 .memberButton { position: absolute; right: 8px; top: 8px; border: 0; border-radius: 6px; background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-secondary); cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 3px 6px; font-size: 11px; }
-.coverActions { position: absolute; bottom: 0; left: 0; right: 0; display: flex; opacity: 0; background: var(--dsw-alias-bg-mask-1); inset: 0; align-items: center; padding: 8px; gap: 6px; }
+.coverActions { position: absolute; bottom: 0; left: 0; right: 0; display: flex; opacity: 0; background: var(--dsw-alias-bg-mask-1); align-items: center; padding: 6px; gap: 6px; }
 .coverActions button { flex: 1; background: var(--dsw-alias-bg-base); margin: 0; min-width: 0; border-radius: 6px; }
 .kbCard:hover .coverActions, .kbCard:focus-within .coverActions { opacity: 1; }
 .kbBody { width: 100%; display: block; padding: 14px 16px 16px; background: transparent; color: inherit; border: 0; text-align: left; cursor: pointer; font: inherit; }
@@ -26,16 +26,16 @@
 .kbBody small { color: var(--dsw-alias-label-secondary); font-size: 12px; display: block; line-height: 20px; }
 .employeeGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; padding: 0 28px 28px; }
 .employeeCard, .employeeCreate { min-width: 0; background: var(--dsw-alias-bg-base); border: 1px solid var(--dsw-alias-border-l3); border-radius: 12px; overflow: hidden; }
-.employeeCreate { min-height: 232px; border-style: dashed; background: transparent; font: inherit; color: var(--dsw-alias-label-secondary); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px; cursor: pointer; }
+.employeeCreate { min-height: 260px; background: var(--dsw-alias-bg-base); font: inherit; color: var(--dsw-alias-label-secondary); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px; cursor: pointer; }
 .employeeTop { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 4px; }
-.employeeBody { padding: 0 20px; text-align: left; }
-.avatar { width: 44px; height: 44px; margin: 0 0 12px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-secondary); overflow: hidden; }
+.employeeBody { padding: 0 15px; text-align: center; flex: 1; }
+.avatar { width: 74px; height: 74px; margin: 0 auto 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-secondary); overflow: hidden; }
 .avatar img { width: 100%; height: 100%; object-fit: cover; }
-.employeeBody h2 { font-size: 17px; line-height: 24px; font-weight: 600; margin: 0 0 6px; overflow-wrap: anywhere; }
+.employeeBody h2 { font-size: 24px; line-height: 24px; font-weight: 600; margin: 0 0 6px; overflow-wrap: anywhere; }
 .employeeBody p { margin: 0; color: var(--dsw-alias-label-secondary); font-size: 13px; height: 40px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 20px; }
-.employeeFooter { display: flex; border-top: 0; margin-top: 0; gap: 8px; padding: 16px; }
-.employeeFooter button { flex: 1; min-width: 0; border-radius: 7px; height: 32px; font-size: 12px; padding: 0 8px; }
-.employeeFooter button:first-child { border-right: 0; }
+.employeeFooter { display: flex; border-top: 1px solid var(--dsw-alias-border-l3); margin-top: 16px; gap: 0; padding: 0; }
+.employeeFooter button { flex: 1; min-width: 0; border-radius: 0; height: 50px; font-size: 13px; padding: 0 8px; }
+.employeeFooter button:first-child { border-right: 1px solid var(--dsw-alias-border-l3); }
 .detailLayout { display: flex; flex: 1; min-height: 0; }
 .aside { width: 160px; flex: none; margin: 20px 12px 20px 20px; padding: 12px 0; border-radius: 10px; background: var(--dsw-alias-bg-base); overflow: auto; border: 1px solid var(--dsw-alias-border-l3); }
 .asideTitle { display: flex; gap: 4px; align-items: center; padding: 0 10px 16px; }
@@ -185,3 +185,20 @@
 .fileContent > button { align-self: flex-start; }
 .fileContent fieldset { display: flex; flex-wrap: wrap; gap: 12px; border: 1px solid var(--dsw-alias-border-l3); }
 .fileContent label { display: flex; flex-direction: column; gap: 6px; }
+
+/* Original QZOS creation dialogs: compact knowledge form and top-labelled employee form. */
+.employeeDialog { width: min(640px, calc(100vw - 32px)); }
+.employeeDialog .formRow > label { width: auto; text-align: left; padding: 0; }
+.employeeDialog .formFields { gap: 20px; }
+.knowledgeDialog { width: min(500px, calc(100vw - 32px)); }
+.knowledgeDialog .formRow > label { width: 112px; }
+.knowledgeDialog .imagePicker { width: 100px; height: 80px; border-radius: 6px; }
+.createKnowledgeLink { align-self: flex-start; color: var(--dsw-alias-brand-primary); }
+.listRefresh { padding: 0 28px 12px; display: flex; justify-content: flex-end; }
+.cardSkeleton { width: 232px; min-height: 224px; border-radius: 12px; background: var(--dsw-alias-bg-layer-1); }
+.employeeCard { display: flex; flex-direction: column; }
+.employeeFooter { margin-top: auto; }
+@media (max-width: 700px) {
+  .knowledgeDialog .formRow > label { width: auto; }
+  .listRefresh { padding: 0 16px 12px; }
+}

@@ -10,6 +10,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { EmployeeFeedback, EmployeeFeedbackButton } from './EmployeeFeedback.tsx'
 import { ProductUpdates } from './ProductUpdates.tsx'
 import { Login } from './Login.tsx'
+import { CatalogRetention } from './CatalogRetention.tsx'
 import { Brand, NativePanelIcon, PanelIcon, QzosPanel } from './Panel.tsx'
 import { createQzosStore } from './store.ts'
 import { panels } from './catalog.ts'
@@ -33,7 +34,8 @@ export function apply(ctx: Context): void {
   ctx.effect(() => ctx.locale.register('qzos', { zh, en }), 'qzos dictionaries')
   const t = ctx.locale.bind('qzos')
   const store = createQzosStore()
-  installKnowledgeResources(ctx)
+  const refreshCatalog = installKnowledgeResources(ctx)
+  ctx.slots.inject('shell.overlay', () => ctx.slots.register({ name: 'shell.overlay', id: 'qzos-catalogs', locale: 'qzos', store }, CatalogRetention))
   installEmployeeContextPresentation(ctx)
   const feedback = createSnapshotStore<SessionId | null>(null)
   const closeFeedback = () => { feedback.set(null) }
@@ -49,7 +51,7 @@ export function apply(ctx: Context): void {
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({ name: 'shell.overlay', id: 'qzos-login', locale: 'qzos', store }, Login))
   for (const [order, panel] of panels.entries()) {
     const id = `qzos-${panel}` as MainPanelId
-    ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: id, locale: 'qzos', store, inject: () => ({ panel, developer, openEmployee, syncEmployees: openEmployee.update }) }, QzosPanel))
+    ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: id, locale: 'qzos', store, inject: () => ({ panel, developer, refreshCatalog, openEmployee, syncEmployees: openEmployee.update }) }, QzosPanel))
     ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id, order: order - 100, label: () => t(panel), inject: () => ({ panel }) }, PanelIcon))
   }
   ctx.slots.inject('main', () => {

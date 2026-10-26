@@ -58,6 +58,7 @@ export const resourceForms = {
     },
     {
       'id': 'image',
+      'required': true,
       'label': 'pc7',
       'kind': 'image',
       'initial': '',

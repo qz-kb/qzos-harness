@@ -28,7 +28,7 @@ export function employeeDraft(row: LoginRecord): PreviewValues {
 export function employeePayload(original: LoginRecord, draft: PreviewValues, menus: LoginRecord[]): LoginRecord {
   employeeDraft(original)
   const kbIds = (draft.kb_ids ?? '').split(',').filter(Boolean).map(Number)
-  const result: LoginRecord = { ...original, ...draft, menus, kb_ids: kbIds, search_mode: draft.search_mode === 'semantic' ? 'similar' : draft.search_mode }
+  const result: LoginRecord = { ...original, use_work_window_model: 1, ...draft, menus, kb_ids: kbIds, search_mode: draft.search_mode === 'semantic' ? 'similar' : draft.search_mode }
   for (const key of ['model_id', 'optimize_m_id']) {
     const [main, sub] = (draft[key] ?? '').split(':')
     result[key] = Number(main) || 0; result[key === 'model_id' ? 'model_sub_id' : 'optimize_s_id'] = Number(sub) || 0
