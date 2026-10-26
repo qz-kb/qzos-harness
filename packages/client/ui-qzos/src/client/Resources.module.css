@@ -202,3 +202,121 @@
   .knowledgeDialog .formRow > label { width: auto; }
   .listRefresh { padding: 0 16px 12px; }
 }
+
+/* Original QZOS knowledge workspace; the surrounding DSH shell keeps its own theme. */
+.knowledgePage, .knowledgeTheme {
+  --dsw-alias-brand-primary: #4b8dff;
+  --dsw-alias-button-primary-fill: #4b8dff;
+  --dsw-alias-button-primary-hover: #79aaff;
+  --dsw-alias-label-primary-foreground: #fff;
+  --dsw-alias-label-primary: #303133;
+  --dsw-alias-label-secondary: #606266;
+  --dsw-alias-label-tertiary: #909399;
+  --dsw-alias-bg-base: #fff;
+  --dsw-alias-bg-module-platform: #f7f7fb;
+  --dsw-alias-bg-layer-1: #f7f7f7;
+  --dsw-alias-border-l3: #dcdfe6;
+  --dsw-alias-interactive-bg-hover: #ecf5ff;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-base);
+}
+.knowledgePage { background: var(--dsw-alias-bg-module-platform); }
+.knowledgeHeading { padding: 30px 24px 20px; }
+.knowledgeHeading h1 { margin: 0 0 16px; font-size: 26px; line-height: 36px; }
+.knowledgeHeading p { margin: 0; color: var(--dsw-alias-label-tertiary); }
+.knowledgePage .listHead { padding: 20px 20px 16px; }
+.knowledgePage .listHead .tabs { gap: 32px; }
+.knowledgePage .listHead .tabs button { padding: 10px 0; font-size: 16px; font-weight: 600; }
+.knowledgePage .listRefresh { position: absolute; right: 20px; top: 134px; padding: 0; }
+.knowledgePage .kbGrid { padding: 0 20px 24px; gap: 20px; }
+.knowledgePage .kbCard, .knowledgePage .kbCreate { border: 0; min-height: 272px; }
+.knowledgePage .kbCreate { border: 1px dashed var(--dsw-alias-border-l3); font-size: 16px; }
+.knowledgePage .kbCreate svg { width: 30px; height: 30px; }
+.knowledgePage .kbCoverButton { padding: 0; }
+.knowledgePage .kbBody { border: 0; padding: 12px 16px 16px; }
+.knowledgePage .kbBody h2 { font-size: 18px; font-weight: 500; }
+.knowledgePage .kbBody p { min-height: 0; white-space: nowrap; display: block; text-overflow: ellipsis; color: var(--dsw-alias-label-tertiary); }
+.knowledgePage .kbBody small { color: var(--dsw-alias-label-tertiary); }
+.knowledgePage .memberButton { color: #fff; background: #0006; font-size: 14px; }
+.knowledgePage .coverActions { background: #0006; padding: 2px 12px; }
+.knowledgePage .coverActions button { background: transparent; color: #fff; font-size: 16px; }
+.knowledgePage .aside { width: 176px; border: 0; margin: 16px; padding: 14px 0; border-radius: 16px; }
+.knowledgePage .asideTitle { padding: 0 12px 14px; gap: 8px; }
+.knowledgePage .asideTitle > button { border-radius: 50%; width: 30px; height: 30px; padding: 0; color: var(--dsw-alias-brand-primary); box-shadow: 0 2px 12px #0001; flex: none; }
+.knowledgePage .asideTitle strong { font-size: 16px; font-weight: 500; }
+.knowledgePage .aside > button { margin: 8px 14px; width: calc(100% - 28px); min-height: 38px; gap: 8px; font-size: 14px; border-radius: 12px; }
+.knowledgePage .aside > button[aria-pressed='true'] { background: var(--dsw-alias-brand-primary); color: #fff; }
+.knowledgePage .detailBody { border: 0; border-radius: 16px; margin: 16px 16px 16px 0; }
+.knowledgePage .inner { padding: 16px; min-height: 100%; box-sizing: border-box; }
+.knowledgePage .inner > .toolbar { border: 0; padding: 0; }
+.knowledgePage .table th { background: var(--dsw-alias-bg-layer-1); font-weight: 500; color: var(--dsw-alias-label-primary); font-size: 14px; border: 0; }
+.knowledgePage .table th:first-child { border-radius: 12px 0 0 12px; }
+.knowledgePage .table th:last-child { border-radius: 0 12px 12px 0; }
+.knowledgePage .table td { padding: 24px 12px; border-color: #ebeef5; }
+.knowledgePage .table th:last-child, .knowledgePage .table td:last-child { position: sticky; right: 0; }
+.knowledgePage .table td:last-child { background: var(--dsw-alias-bg-base); }
+.knowledgePage .rowActions { flex-wrap: nowrap; }
+.knowledgePage .rowActions button { color: var(--dsw-alias-brand-primary); font-size: 13px; }
+.knowledgePage .formFields.topLabels { max-width: none; padding: 16px 0; }
+.knowledgePage .topLabels .formControl { max-width: none; }
+.knowledgePage .formFooter { padding: 16px 0; border: 0; }
+.knowledgePage .importTabs { margin-top: 20px; max-width: 900px; gap: 12px 16px; }
+.knowledgePage .importTabs button { min-height: 76px; }
+.knowledgePage .importTabs button[aria-pressed='true'] { background: #edf4ff; }
+.knowledgePage .dropZone { min-height: 120px; margin: 16px 0; }
+.knowledgePage .dropZone small { width: 100%; text-align: center; color: var(--dsw-alias-label-secondary); }
+.importFooter { position: sticky; bottom: -16px; background: var(--dsw-alias-bg-base); display: flex; justify-content: center; padding: 16px; margin-top: 24px; border-top: 1px solid var(--dsw-alias-border-l3); z-index: 1; }
+.importFiles { margin: 16px 0; }
+.importFiles > div { display: flex; justify-content: space-between; align-items: center; border-radius: 8px; padding: 8px 12px; background: var(--dsw-alias-bg-module-platform); margin-bottom: 8px; }
+.searchColumns { min-height: 480px; }
+.searchField { display: flex; gap: 12px; align-items: flex-start; }
+.searchField > span { white-space: nowrap; padding-top: 8px; }
+.searchField textarea { min-height: 390px; }
+.searchButtons { margin-left: 68px; margin-top: 16px; }
+.searchEmpty { min-height: 400px; display: flex; align-items: center; justify-content: center; flex-direction: column; color: var(--dsw-alias-label-secondary); }
+.searchEmpty::before { content: ''; display: block; width: 160px; height: 125px; background: url('./knowledge-empty.png') center / contain no-repeat; margin-bottom: 20px; }
+.knowledgeDialog { width: min(560px, calc(100vw - 32px)); }
+.knowledgeTheme .formFields { padding: 20px 12px 28px; gap: 20px; }
+.knowledgeTheme .formRow > label { width: 130px; }
+.knowledgeTheme select:disabled { background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-tertiary); }
+.fieldHelp { margin-left: 6px; display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; font-size: 11px; background: var(--dsw-alias-label-secondary); color: var(--dsw-alias-bg-base); cursor: help; }
+.switchRow { display: flex; align-items: center; gap: 8px; }
+.switchRow small { margin: 0; }
+.switchControl { width: 40px; height: 20px; border: 0; border-radius: 12px; padding: 2px; background: var(--dsw-alias-border-l3); cursor: pointer; flex: none; }
+.switchControl::before { content: ''; width: 16px; height: 16px; display: block; border-radius: 50%; background: var(--dsw-alias-bg-base); transition: transform .15s; }
+.switchControl[aria-checked='true'] { background: var(--dsw-alias-brand-primary); }
+.switchControl[aria-checked='true']::before { transform: translateX(20px); }
+.switchControl:disabled { opacity: .5; cursor: not-allowed; }
+.fragmentDialog, .memberDialog, .aclDialog { width: min(900px, calc(100vw - 32px)); }
+.fragmentFields { display: grid; grid-template-columns: 1fr 1fr; max-width: none; padding: 0; }
+.fragmentFields .formRow { display: block; }
+.fragmentFields .formRow > label { display: block; width: auto; text-align: left; margin-bottom: 8px; }
+.memberColumns { display: grid; grid-template-columns: 1fr 1fr; min-height: 340px; }
+.memberColumns > div { padding: 12px 20px; overflow: auto; max-height: 500px; }
+.memberColumns > div + div { border-left: 1px solid var(--dsw-alias-border-l3); }
+.memberOption { display: flex; align-items: center; gap: 8px; padding: 12px 0; }
+.memberOption select { margin-left: auto; }
+.memberAvatar { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; background: var(--dsw-alias-bg-layer-1); flex: none; }
+.deletePrompt { font-size: 16px; padding: 12px 0; }
+@media (max-width: 700px) {
+  .knowledgePage .aside { width: auto; margin: 12px; }
+  .knowledgePage .aside > button { width: auto; display: inline-flex; margin: 4px; }
+  .knowledgePage .detailBody { margin: 0 12px 12px; }
+  .knowledgePage .listRefresh { top: 150px; right: 12px; }
+  .knowledgeTheme .formRow > label { width: auto; }
+  .memberColumns, .fragmentFields { grid-template-columns: 1fr; }
+  .memberColumns > div + div { border: 0; border-top: 1px solid var(--dsw-alias-border-l3); }
+  .searchButtons { margin-left: 0; }
+}
+.attachmentFields { display: flex; flex-direction: column; gap: 16px; margin-top: 20px; }
+.attachmentPicker { position: relative; display: inline-flex; padding: 8px 16px; border: 1px dashed var(--dsw-alias-border-l3); border-radius: 8px; color: var(--dsw-alias-brand-primary); cursor: pointer; }
+.attachmentPicker input { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
+.attachmentFields .inline > span { overflow-wrap: anywhere; }
+
+.memberIdentity { display: flex; align-items: center; gap: 8px; min-width: 160px; }
+.memberIdentity > span { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.knowledgePage .table th:has(> input[type='checkbox']), .knowledgePage .table td:has(> input[type='checkbox']) { width: 32px; min-width: 32px; }
+.knowledgePage .rowActions button { white-space: nowrap; flex: none; }
+
+.tableSkeleton { height: 100px; margin-top: 12px; border-radius: 12px; background: var(--dsw-alias-bg-layer-1); }

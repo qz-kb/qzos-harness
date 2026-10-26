@@ -34,3 +34,18 @@ it('filters authorized libraries and retains selection when searching', () => {
   fireEvent.click(screen.getByRole('checkbox', { name: '产品' }))
   expect(change).toHaveBeenCalledWith('kb_ids', '1,2')
 })
+it('allows configured models at creation and keeps only the existing vector model locked in settings', () => {
+  const change = vi.fn()
+  const options = { embedding_model_id: [{ value: '1', label: '默认向量' }, { value: '2', label: '其他向量' }], documents_model_id: [{ value: '3:31', label: '默认文件模型' }, { value: '4:41', label: '其他文件模型' }, { value: '5:51', label: '不可用模型', disabled: true }] }
+  const draft = { embedding_model_id: '1', documents_model_id: '3:31' }
+  const view = render(<ResourceFields form="knowledgeCreate" draft={draft} options={options} knowledge={[]} onChange={change} t={t} />)
+  expect((screen.getByRole('combobox', { name: '向量模型' }) as HTMLSelectElement).disabled).toBe(false)
+  fireEvent.change(screen.getByRole('combobox', { name: '文件处理模型' }), { target: { value: '4:41' } })
+  expect(change).toHaveBeenCalledWith('documents_model_id', '4:41')
+  expect((screen.getByRole('option', { name: '不可用模型' }) as HTMLOptionElement).disabled).toBe(true)
+  view.rerender(<ResourceFields form="knowledgeSettings" draft={draft} options={options} knowledge={[]} onChange={change} t={t} editing />)
+  expect((screen.getByRole('combobox', { name: '向量模型' }) as HTMLSelectElement).disabled).toBe(true)
+  expect((screen.getByRole('combobox', { name: '文件处理模型' }) as HTMLSelectElement).disabled).toBe(false)
+  fireEvent.click(screen.getByRole('switch', { name: '允许对外数字员工使用' }))
+  expect(change).toHaveBeenCalledWith('external_enabled', '1')
+})

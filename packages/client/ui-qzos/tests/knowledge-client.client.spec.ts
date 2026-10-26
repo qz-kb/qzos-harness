@@ -2,7 +2,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { ResourceRegistry } from '../../resources/src/client/resources.ts'
-import { installKnowledgeResources, readConnections, knowledgeSearchInput, knowledgeRequest, knowledgePages, knowledgeTable, saveKnowledge } from '../src/client/knowledge-client.ts'
+import { installKnowledgeResources, readConnections, knowledgeSearchInput, knowledgeRequest, knowledgePages, knowledgeTable, saveKnowledge, knowledgeLearningPending } from '../src/client/knowledge-client.ts'
 import { loginApi, loginSessionKey } from '../src/client/login-client.ts'
 
 function setup() {
@@ -118,4 +118,11 @@ it.each(['knowledge', 'employees'])('retains %s cards and coalesces refreshes du
     const next = registry.source(`dsh-resource://qzos-knowledge/${kind}?epoch=2&revision=0`)
     expect(next.getSnapshot().value).toBeUndefined()
   } finally { account.abort(); await fiber.dispose() }
+})
+
+it('refreshes legacy queued rows as well as staged incremental learning', () => {
+  expect(knowledgeLearningPending({ rows: [{ status: 1 }], learning: { pending: false } })).toBe(true)
+  expect(knowledgeLearningPending({ rows: [], learning: { pending: true } })).toBe(true)
+  expect(knowledgeLearningPending({ rows: [], qa: { lists: [{ status: 0 }] } })).toBe(true)
+  expect(knowledgeLearningPending({ rows: [{ status: 2 }, { status: 3 }], learning: { pending: false } })).toBe(false)
 })

@@ -18,7 +18,7 @@ export function KnowledgeFile(props: FileProps) {
   const [revision, setRevision] = useState(0)
   const remote = useResource<'qzos-knowledge'>(`dsh-resource://qzos-knowledge/file?fd=${fd}&epoch=${epoch}&revision=${revision}`)
   const refresh = () => { setRevision(value => value + 1); props.onChanged() }
-  return <Modal open title={`${t('fileAccess')} · ${name}`} closeLabel={t('loginClose')} onClose={props.onClose} className={css.dialog as string} footer={<Button onClick={props.onClose}>{t('loginClose')}</Button>}>
+  return <Modal open title={`${t('fileAccess')} · ${name}`} closeLabel={t('loginClose')} onClose={props.onClose} className={`${css.aclDialog} ${css.knowledgeTheme}`} footer={<Button onClick={props.onClose}>{t('loginClose')}</Button>}>
     <Button onClick={refresh}>{t('parseRefresh')}</Button>
     {remote.status === 'failed' ? <p role="alert">{remote.failure?.message}</p> : !remote.value ? <p role="status">{t('kbLoading')}</p>
       : <FileContent key={`${epoch}:${revision}`} {...props} value={remote.value} refresh={refresh} />}

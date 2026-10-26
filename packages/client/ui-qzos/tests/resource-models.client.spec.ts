@@ -16,3 +16,6 @@ it('saves a window-only employee and preserves explicit visitor configuration on
   const configured = { ...original, model_id: 12, model_sub_id: 13 }
   expect(employeePayload(configured, employeeDraft(configured), [])).toMatchObject({ model_id: 12, model_sub_id: 13 })
 })
+it('prefers a ready default child model and never substitutes a disabled default', () => {
+  expect(resourceModelDefaults({ chatModels: [{ id: 3, is_default: 1, models: [{ id: 31 }, { id: 32, is_default: 1 }, { id: 33, is_default: 1, is_ready: false }] }] }).documents_model_id).toBe('3:32')
+})

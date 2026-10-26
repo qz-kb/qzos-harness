@@ -1,6 +1,7 @@
 /** Locale keys for labels retained from the QZOS source pages. */
 import type { QzosKey } from './locales.ts'
 export const resourceCopy = {
+  joinedAt: 'knowledgeMemberJoined',
   fileAccess: 'fileAccess',
   parseStatus: 'parseTitle',
   edit: 'editKnowledge',

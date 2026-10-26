@@ -207,7 +207,15 @@ export function installKnowledgeResources(ctx: Context): (panel: string) => void
             ])
             value = { rows, learning: loginRecord(learning), qa: loginRecord(qa) }; break
           }
-          case 'members': value = { rows: knowledgeRows(await knowledgeRequest(`/kb.know/teamLists?kb_id=${encodeURIComponent(id)}`, undefined, signal)) }; break
+          case 'import-capabilities': value = { capabilities: loginRecord(await knowledgeRequest('/kb.teach/importCapabilities', undefined, signal)) }; break
+          case 'member-options': value = { rows: await knowledgePages(`/kb.know/teamUsers?kb_id=${encodeURIComponent(id)}&keyword=${encodeURIComponent(url.searchParams.get('query') ?? '')}`, signal) }; break
+          case 'members': {
+            const [rows, profile] = await Promise.all([
+              knowledgeRequest(`/kb.know/teamLists?kb_id=${encodeURIComponent(id)}`, undefined, signal),
+              knowledgeRequest('/user/info', undefined, signal),
+            ])
+            value = { rows: knowledgeRows(rows), currentSn: knowledgeText(loginRecord(profile).sn) }; break
+          }
           default: throw new Error('Unknown QZOS resource')
         }
         yield { ok: true as const, value }
@@ -241,7 +249,7 @@ export function knowledgeDraft(row: LoginRecord): PreviewValues {
 export function knowledgeTable(rows: LoginRecord[], kind: 'files' | 'fragments' | 'members'): PreviewRow[] {
   return rows.map(row => kind === 'files' ? { ...knowledgeDraft(row), id: knowledgeText(row.id), name: knowledgeText(row.name), waiting: knowledgeText(row.wait_sum ?? 0), trained: knowledgeText(row.ok_sum ?? 0), totalData: knowledgeText(row.total_sum ?? row.count ?? 0), createdAt: knowledgeText(row.create_time ?? ''), parseState: row.parse ? knowledgeText(loginRecord(row.parse).status_msg) : '', hasParse: row.parse ? '1' : '0', status: row.parse && [0, 1].includes(Number(loginRecord(row.parse).status)) ? 'processing' : '' }
     : kind === 'fragments' ? { ...knowledgeDraft(row), id: knowledgeText(row.uuid), name: knowledgeText(row.question ?? ''), status: Number(row.status) === 2 ? 'learned' : Number(row.status) === 3 ? 'failedLearn' : Number(row.status) === 1 ? 'learning' : 'waitingLearn', consumed: knowledgeText(row.tokens ?? 0), updatedAt: knowledgeText(row.update_time ?? '') }
-      : { ...knowledgeDraft(row), id: knowledgeText(row.id), name: knowledgeText(row.nickname), role: Number(row.owned) === 1 ? 'owner' : 'member', power: Number(row.power) === 1 ? 'manage' : Number(row.power) === 2 ? 'edit' : 'view' })
+      : { ...knowledgeDraft(row), id: knowledgeText(row.id), name: knowledgeText(row.nickname), role: Number(row.owned) === 1 ? 'owner' : 'member', createdAt: knowledgeText(row.create_time ?? ''), power: Number(row.owned) === 1 ? 'all' : Number(row.power) === 1 ? 'manage' : Number(row.power) === 2 ? 'edit' : 'view' })
 }
 /** Save only fields supported by the existing knowledge management endpoint.
  * @param id - Existing knowledge ID, or null to create.
@@ -270,4 +278,14 @@ export function knowledgeSearchInput(draft: PreviewValues): LoginRecord {
     .map(key => [key, Number(draft[key]) || 0]))
   return { ...numbers, search_mode: draft.search_mode === 'semantic' ? 'similar' : draft.search_mode,
     optimize_m_id: Number(draft.optimize_m_id?.split(':')[0]) || 0, optimize_s_id: Number(draft.optimize_m_id?.split(':')[1]) || 0 }
+}
+
+/** Whether visible or staged fragments still need status refresh; supports both learning modes.
+ * @param value - Current fragment resource, including legacy rows and incremental detection.
+ * @returns True while learning or question splitting is in progress.
+ */
+export function knowledgeLearningPending(value: LoginRecord): boolean {
+  return loginRecord(value.learning ?? {}).pending === true
+    || knowledgeRows(value.rows ?? []).some(row => [0, 1].includes(Number(row.status)))
+    || knowledgeRows(loginRecord(value.qa ?? {}).lists ?? []).some(row => [0, 1].includes(Number(row.status)))
 }
