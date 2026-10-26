@@ -13,6 +13,7 @@ it.skipIf(!process.env.QZOS_RESOURCE_TEST_ACCOUNT)('retains catalog cards and cr
   let token = ''
   let knowledgeId = 0, employeeId = 0
   let modelReads = 0
+  let releaseList: (() => void) | undefined
   page.on('request', (request) => {
     if (request.url().startsWith('http://127.0.0.1:3082/api/')) {
       token = request.headers().token || token
@@ -55,6 +56,18 @@ it.skipIf(!process.env.QZOS_RESOURCE_TEST_ACCOUNT)('retains catalog cards and cr
     expect(await page.getByText('正在加载知识库…', { exact: true }).count()).toBe(0)
     expect(modelReads).toBe(0)
     await nav.getByRole('button', { name: '数字员工', exact: true }).click()
+    // Delay an actual old server response across creation to exercise an in-flight refresh.
+    const heldList = new Promise<void>((resolve) => { releaseList = resolve })
+    let capturedList = false
+    await page.route('**/api/kb.know/lists?*', async (route) => {
+      const response = await route.fetch()
+      capturedList = true
+      await heldList
+      await route.fulfill({ response })
+    }, { times: 1 })
+    await nav.getByRole('button', { name: '知识库', exact: true }).click()
+    await expect.poll(() => capturedList).toBe(true)
+    await nav.getByRole('button', { name: '数字员工', exact: true }).click()
     await panel.getByRole('button', { name: '创建数字员工', exact: true }).click()
     const employee = page.getByRole('dialog', { name: '新建数字员工', exact: true })
     const stamp = Date.now()
@@ -80,6 +93,13 @@ it.skipIf(!process.env.QZOS_RESOURCE_TEST_ACCOUNT)('retains catalog cards and cr
     expect(await employee.getByRole('textbox', { name: '名称', exact: true }).inputValue()).toBe(name)
     expect(await employee.getByRole('textbox', { name: '一句话介绍', exact: true }).inputValue()).toBe('创建知识库后保留草稿')
     expect(await employee.getByRole('checkbox', { name: kbName, exact: true }).isChecked()).toBe(true)
+    const refreshedList = page.waitForResponse(async (response) => {
+      if (!response.url().includes('/kb.know/lists?')) return false
+      const value = await response.json() as { data: { lists: { id: number }[] } }
+      return value.data.lists.some(row => Number(row.id) === knowledgeId)
+    })
+    releaseList!()
+    await refreshedList
     expect(String((await api(`/kb.know/detail?id=${knowledgeId}`)).embedding_model_id)).toBe(vectorId)
     const employeeAdded = page.waitForResponse(response => response.url().includes('/kb.robot/add') && response.request().method() === 'POST')
     await employee.getByRole('button', { name: '创建并配置', exact: true }).click()
@@ -97,6 +117,7 @@ it.skipIf(!process.env.QZOS_RESOURCE_TEST_ACCOUNT)('retains catalog cards and cr
   } catch (error) {
     await screenshot('failure'); throw error
   } finally {
+    releaseList?.()
     // Only this test's newly created synthetic resources are removed.
     if (employeeId) await api('/kb.robot/del', { id: employeeId })
     if (knowledgeId) await api('/kb.know/del', { id: knowledgeId })
