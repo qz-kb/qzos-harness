@@ -49,5 +49,5 @@ export function EmployeeSquare(props: Props) {
       </>}
   </>
   return props.inline ? <div className={css.squareContent}>{content}</div>
-    : <Modal open onClose={onClose} title={t(employeeId ? 'employeeShare' : 'employeeSquare')} closeLabel={t('loginClose')} className={`${css.dialog} ${css.knowledgeTheme}`} footer={<Button onClick={onClose}>{t('loginClose')}</Button>}>{content}</Modal>
+    : <Modal open onClose={onClose} title={t(employeeId ? 'employeeShare' : 'employeeSquare')} closeLabel={t('loginClose')} className={css.dialog as string} footer={<Button onClick={onClose}>{t('loginClose')}</Button>}>{content}</Modal>
 }

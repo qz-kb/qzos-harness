@@ -40,7 +40,7 @@ export function KnowledgeAcl({ fd, onClose, ...props }: PanelProps & { fd: strin
     finally { pending.current = false; setBusy(false) }
   }
   const permissions = [[1, 'aclView'], [2, 'aclReference'], [4, 'aclDownload'], [8, 'aclEdit'], [16, 'aclDelete']] as const
-  return <Modal open onClose={onClose} title={t('pc118')} closeLabel={t('loginClose')} className={`${css.aclDialog} ${css.knowledgeTheme}`} footer={<Button onClick={onClose}>{t('loginClose')}</Button>}>
+  return <Modal open onClose={onClose} title={t('pc118')} closeLabel={t('loginClose')} className={css.aclDialog as string} footer={<Button onClick={onClose}>{t('loginClose')}</Button>}>
     <p className={css.notice}>{t('knowledgeAclHint')}</p>
     {remote.status === 'failed' && <p role="alert">{remote.failure?.message}</p>}
     {error && <p role="alert">{error}</p>}

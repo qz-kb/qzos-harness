@@ -240,7 +240,7 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
           <ResourceTable paginate loading={recordResource.status === 'loading' && !recordResource.value} rows={dialogueRows} r={r} selection={selected} onSelection={setSelected} columns={[['id', 'id'], ['userInfo', 'userInfo'], ['question', 'question'], ['answer', 'answer'], ['feedback', 'feedback'], ['questionTime', 'questionTime']]} actions={row => [{ label: 'questionFeedback', run: () =>{  show('feedback', row) } }, { label: 'correct', run: () =>{  show('correct', row) } }, { label: 'viewReply', run: () =>{  show('reply', row, true) } }, { label: 'delete', run: () =>{  setConfirmation({ key: dialoguesKey, ids: [row.id] }) } }]} />
         </>}
     </div>}
-    <Modal open={newKnowledge !== null} onClose={() => { if (!busy) setNewKnowledge(null) }} title={r('newKnowledge')} closeLabel={r('close')} className={`${css.knowledgeDialog} ${css.knowledgeTheme}`}
+    <Modal open={newKnowledge !== null} onClose={() => { if (!busy) setNewKnowledge(null) }} title={r('newKnowledge')} closeLabel={r('close')} className={css.knowledgeDialog as string}
       footer={<><Button disabled={busy} onClick={() => { setNewKnowledge(null) }}>{t('backToEmployee')}</Button><Button variant="primary" type="submit" form="employee-linked-knowledge" disabled={busy}>{t('createAndLink')}</Button></>}>
       {notice && <p role="alert">{notice}</p>}
       <form id="employee-linked-knowledge" onSubmit={(event) => {
@@ -256,7 +256,7 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
         })
       }}><ResourceFields form="knowledgeCreate" draft={{ ...props.modelDefaults, ...newKnowledge }} knowledge={[]} options={modelOptions} t={t} disabled={busy} onChange={(key, value) => { setNewKnowledge(current => ({ ...current, [key]: value })) }} /></form>
     </Modal>
-    <Modal open={dialog !== null} onClose={() => { setIssuedKey(''); setDialog(null) }} closeLabel={r('close')} title={r(dialogTitle)} className={`${css.dialog} ${css.employeeDialog} ${css.knowledgeTheme}`}
+    <Modal open={dialog !== null} onClose={() => { setIssuedKey(''); setDialog(null) }} closeLabel={r('close')} title={r(dialogTitle)} className={`${css.dialog} ${css.employeeDialog}`}
       footer={<><Button variant="outline" onClick={() => { setIssuedKey(''); setDialog(null) }}>{r('cancel')}</Button>{dialog?.kind !== 'keys' && <Button variant="primary" disabled={busy || menuImageLoading} onClick={saveDialog}>{r('confirm')}</Button>}</>}>
       {dialog?.kind === 'binding' ? <div className={css.checkList}>{catalogs.skills.map(record => <label key={record.id}><input type="radio" name="qzos-binding" disabled={bindings.some(binding => binding.targetId === record.id)} checked={dialogDraft.binding === record.id} onChange={() =>{  setDialogDraft(current => ({ ...current, binding: record.id })) }} />{record.title}</label>)}</div>
         : dialog?.kind === 'keys' ? <>
@@ -281,11 +281,11 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
                       setDialogDraft(current => ({ ...current, [key]: value, correction_key: randomUUID() }))
                     }} />{dialog?.kind === 'menu' && <EmployeeMenuImages key={dialog.row?.id ?? 'new'} onBusy={setMenuImageLoading} t={t} images={menuImages} onChange={setMenuImages} disabled={Boolean(dialog.readOnly) || busy} />}</>}
     </Modal>
-    <Modal className={`${css.employeeDialog} ${css.knowledgeTheme}`} open={confirmKnowledgeRemoval} onClose={() => { if (!busy) setConfirmKnowledgeRemoval(false) }} closeLabel={r('close')} title={t('employeeKnowledgeRemove')} description={t('employeeKnowledgeRemoveHint')}
+    <Modal className={css.employeeDialog as string} open={confirmKnowledgeRemoval} onClose={() => { if (!busy) setConfirmKnowledgeRemoval(false) }} closeLabel={r('close')} title={t('employeeKnowledgeRemove')} description={t('employeeKnowledgeRemoveHint')}
       footer={<><Button disabled={busy} variant="outline" onClick={() => { setConfirmKnowledgeRemoval(false) }}>{r('cancel')}</Button><Button disabled={busy} variant="primary" onClick={saveConfiguration}>{r('confirm')}</Button></>}>
       {notice && <p role="alert">{notice}</p>}
     </Modal>
-    <Modal className={`${css.employeeDialog} ${css.knowledgeTheme}`} open={confirmation !== null} onClose={() =>{  setConfirmation(null) }} closeLabel={r('close')} title={r('deleteConfirm')} description={r('deleteHint')}
+    <Modal className={css.employeeDialog as string} open={confirmation !== null} onClose={() =>{  setConfirmation(null) }} closeLabel={r('close')} title={r('deleteConfirm')} description={r('deleteHint')}
       footer={<><Button variant="outline" onClick={() =>{  setConfirmation(null) }}>{r('cancel')}</Button><Button variant="primary" disabled={busy} onClick={remove}>{r('confirmDelete')}</Button></>} />
   </div>
 }

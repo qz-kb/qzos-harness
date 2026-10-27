@@ -41,7 +41,7 @@ export function KnowledgeMembers({ kb, onClose, onSaved, ...props }: PanelProps 
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('errorHint')) }
     finally { pending.current = false; setBusy(false) }
   }
-  return <Modal open onClose={() => { if (!busy) onClose() }} title={t(resourceCopy.addMember)} closeLabel={t(resourceCopy.close)} className={`${css.memberDialog} ${css.knowledgeTheme}`}
+  return <Modal open onClose={() => { if (!busy) onClose() }} title={t(resourceCopy.addMember)} closeLabel={t(resourceCopy.close)} className={css.memberDialog as string}
     footer={<><Button disabled={busy} onClick={onClose}>{t(resourceCopy.cancel)}</Button><Button variant="primary" disabled={busy || !Object.keys(selected).length || remote.status === 'failed'} onClick={() => { void save() }}>{t(resourceCopy.confirm)}</Button></>}>
     {error && <p role="alert">{error}</p>}
     {remote.status === 'failed' && <p role="alert">{remote.failure?.message}<Button onClick={() => { setRevision(value => value + 1) }}>{t(resourceCopy.refresh)}</Button></p>}
