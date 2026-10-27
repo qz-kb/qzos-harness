@@ -10,9 +10,10 @@ export const managedAccount = globalThis.__QZOS_MANAGED_ACCOUNT__
 /** Same-origin cookies are used only by the enterprise gateway. */
 export const loginCredentials: RequestCredentials = managedAccount ? 'same-origin' : 'omit'
 /** Business API selected by the private Host composition or a same-origin reverse proxy. */
+const baseUri = typeof document === 'undefined' ? 'http://localhost/' : document.baseURI
 export const loginApi = managedAccount
-  ? new URL('_qzos/business', document.baseURI).href
-  : globalThis.__QZOS_BUSINESS_API__ ?? new URL('api', document.baseURI).href
+  ? new URL('_qzos/business', baseUri).href
+  : globalThis.__QZOS_BUSINESS_API__ ?? new URL('api', baseUri).href
 /** Public visitor origin configured independently from the authenticated proxy. */
 export const publicVisitorApi = globalThis.__QZOS_PUBLIC_VISITOR_ORIGIN__ ?? (managedAccount ? '' : loginApi)
 /** Storage key for the API-scoped business credential. */
