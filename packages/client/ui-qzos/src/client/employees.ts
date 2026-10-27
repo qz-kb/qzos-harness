@@ -5,7 +5,7 @@ import type { InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigge
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { catalogs, type Example } from './catalog.ts'
+import { type Example } from './catalog.ts'
 import { knowledgePages, knowledgeRequest } from './knowledge-client.ts'
 import { employeeCard } from './employee-client.ts'
 import { employeeHost } from './employee-host.ts'
@@ -27,7 +27,7 @@ type Translate = (key: QzosKey) => string
  * @param employees - current employee directory.
  * @returns the reference, or undefined for an unavailable employee.
  */
-export function employeeReference(id: string, employees: readonly Example[] = catalogs.employees): ReferenceInsert | undefined {
+export function employeeReference(id: string, employees: readonly Example[]): ReferenceInsert | undefined {
   const employee = employees.find(item => item.id === id && item.status === 'ready')
   return employee && { source: sourceName, ref: employee.id, label: `@${employee.title}`, clipboardText: `@${employee.title}`, appearance: 'session' }
 }

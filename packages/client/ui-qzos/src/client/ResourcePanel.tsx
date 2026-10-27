@@ -73,7 +73,7 @@ export function ResourcePanel(props: ResourcePanelProps) {
   const [nestedKnowledgeId, setNestedKnowledgeId] = useState<string | null>(null)
   const [createdKnowledge, setCreatedKnowledge] = useState<Example | null>(null)
   const optionsRemote = props.useResource<'qzos-knowledge'>(configuration || selected ? `dsh-resource://qzos-knowledge/models?epoch=${epoch}&revision=${revision}` : '')
-  const linkedRemote = props.useResource<'qzos-knowledge'>(panel === 'employees' ? `dsh-resource://qzos-knowledge/list?epoch=${epoch}&revision=${revision}&all=1` : '')
+  const linkedRemote = props.useResource<'qzos-knowledge'>(`dsh-resource://qzos-knowledge/list?epoch=${epoch}&revision=${revision}&all=1`)
   const models = optionsRemote.value ? loginRecord(optionsRemote.value.models) : {}
   const defaults = resourceModelDefaults(models)
   useEffect(() => { props.refreshCatalog(panel) }, [panel, props.refreshCatalog])
@@ -195,7 +195,7 @@ export function ResourcePanel(props: ResourcePanelProps) {
         {menus.map(([tab, key]) => <Button key={tab} aria-pressed={section === tab} onClick={() => { if (tab === 'chat') employeeCommand('chat', item); else actions.setSection(panel, tab) }}>{panel === 'employees' ? tab === 'edit' ? <IconSettingsOutlineRegular size={16} /> : tab === 'release' ? <IconPaperPlaneOutlineRegular size={16} /> : <ChatIcon size={16} /> : (tab === 'dataStudy' ? <IconQueueOutlineRegular size={16} /> : tab === 'testData' ? <IconSearchOutlineRegular size={16} /> : tab === 'teamData' ? <IconUsersOutlineRegular size={16} /> : <IconSettingsOutlineRegular size={16} />)}{r(key)}</Button>)}
       </aside>
       <div className={css.detailBody}>{panel === 'knowledge'
-        ? <KnowledgeDetail key={`${item.id}:${section}`} {...props} item={item} section={section} onDelete={() =>{  setDeleting(item) }} modelOptions={modelOptions} />
+        ? <KnowledgeDetail key={`${item.id}:${section}`} {...props} item={item} section={section} knowledge={knowledge} onDelete={() =>{  setDeleting(item) }} modelOptions={modelOptions} />
         : <EmployeeDetail key={`${item.id}:${section}`} {...props} item={item} section={section} knowledge={knowledge} modelDefaults={defaults} modelOptions={{ ...modelOptions, model_id: modelOptions.documents_model_id, optimize_m_id: modelOptions.documents_model_id }} onSaved={() => { props.refreshCatalog('employees') }} />}</div>
     </div>}
     <Modal open={configuration !== null && nestedKnowledge === null} onClose={() =>{ if (!busy) setConfiguration(null) }} closeLabel={r('close')} className={(panel === 'knowledge' ? css.knowledgeDialog : `${css.dialog} ${css.employeeDialog}`) as string}

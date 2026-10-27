@@ -11,7 +11,7 @@ import css from './Panel.module.css'
 type Props = PanelProps & { panel: 'skills' | 'connectors' | 'templates' }
 type Dialog = { kind: 'install' | 'uninstall' | 'share' | 'template' | 'request' | 'detail'; row: LoginRecord; data?: LoginRecord }
 
-/** Replace sample catalogs with server-authorized resources and existing lifecycle operations. */
+/** Render server-authorized skill, connection and template resources with existing lifecycle operations. */
 export function CapabilityPanel(props: Props) {
   const { panel, t, useResource, useStore, actions } = props
   const epoch = useStore(s => s.businessEpoch)

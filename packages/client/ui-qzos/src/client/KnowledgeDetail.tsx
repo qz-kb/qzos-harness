@@ -22,6 +22,7 @@ import css from './Resources.module.css'
 type KnowledgeDetailProps = PanelProps & {
   item: Example
   section: string
+  knowledge: Example[]
   onDelete: () => void
   modelOptions: Record<string, { value: string; label: string; disabled?: boolean }[]> }
 type Dialog = { kind: 'rename' | 'fragment' | 'member' | 'acl' | 'parameters' | 'transfer'; row?: PreviewRow }
@@ -36,7 +37,7 @@ export function KnowledgeDetail(props: KnowledgeDetailProps) {
   return <KnowledgeContent {...props} detail={detail} />
 }
 function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string, unknown> }) {
-  const { item, section, useStore, useResource, actions, t, onDelete, modelOptions, detail } = props
+  const { item, section, useStore, useResource, actions, t, onDelete, modelOptions, detail, knowledge } = props
   const r = (key: ResourceText) => key === 'saved' || key === 'settingsSaved' ? t('kbSaved') : t(resourceCopy[key])
   const [lifetime] = useState(() => new AbortController())
   const credential = useRef(storedLogin(sessionStorage))
@@ -120,7 +121,6 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
     const timer = setTimeout(() => { setRevision(value => value + 1) }, 5000)
     return () => { clearTimeout(timer) }
   }, [section, mode, busy, documentsResource.value, documentsResource.status, fragmentsResource.value, fragmentsResource.status])
-  const knowledge = useStore(state => state.knowledge)
   const owned = Number(detail.owned) === 1
   const manageable = Number(detail.power) === 1
   const editable = [1, 2].includes(Number(detail.power))
