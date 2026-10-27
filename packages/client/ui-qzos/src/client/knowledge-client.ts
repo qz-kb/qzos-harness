@@ -119,7 +119,6 @@ export function installKnowledgeResources(ctx: Context): (panel: string) => void
                 yield { ok: true as const, value: { rows } }
               } catch (error) {
                 if (signal.aborted) return
-                if (error instanceof LoginError && [-1, -2].includes(error.code)) yield { ok: true as const, value: { rows: [] } }
                 yield { ok: false as const, error: Object.assign(new Error(error instanceof Error ? error.message : 'QZOS request failed'), { code: 'gateway/internal' as const, details: {}, isDSHRemoteError: true as const }) }
               }
               await refreshed
