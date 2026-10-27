@@ -17,3 +17,11 @@ it('selects only the current page and retains prior selections', () => {
   expect(screen.getByRole('cell', { name: 'fragment-1' })).toBeDefined()
   expect((screen.getByRole('button', { name: 'next' }) as HTMLButtonElement).disabled).toBe(true)
 })
+it('uses server page and total without slicing the supplied rows', () => {
+  const change = vi.fn()
+  render(<ResourceTable paginate page={2} total={40} pageSize={15} onPage={change} rows={[{ id: '16', name: 'fragment-16' }]} columns={[[ 'name', 'name' ]]} r={key => key} />)
+  expect(screen.getByRole('cell', { name: 'fragment-16' })).toBeDefined()
+  expect(screen.getByText('2 / 3')).toBeDefined()
+  fireEvent.click(screen.getByRole('button', { name: 'next' }))
+  expect(change).toHaveBeenCalledWith(3)
+})

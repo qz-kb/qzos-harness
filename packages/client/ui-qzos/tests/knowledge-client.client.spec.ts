@@ -2,7 +2,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { ResourceRegistry } from '../../resources/src/client/resources.ts'
-import { installKnowledgeResources, readConnections, knowledgeSearchInput, knowledgeRequest, knowledgePages, knowledgeTable, saveKnowledge, knowledgeLearningPending } from '../src/client/knowledge-client.ts'
+import { installKnowledgeResources, readConnections, knowledgeSearchInput, knowledgeRequest, knowledgePage, knowledgePages, knowledgeTable, saveKnowledge, knowledgeLearningPending } from '../src/client/knowledge-client.ts'
 import { loginApi, loginSessionKey } from '../src/client/login-client.ts'
 
 function setup() {
@@ -40,6 +40,12 @@ it('reads all pages and rejects a truncated collection', async () => {
   expect(await knowledgePages('/kb.know/lists?type=0')).toHaveLength(2)
   fetcher.mockResolvedValue(reply({ lists: [], count: 1 }))
   await expect(knowledgePages('/kb.know/lists')).rejects.toThrow('pagination')
+})
+it('reads one page with the server total', async () => {
+  const { fetcher } = setup()
+  fetcher.mockResolvedValue(reply({ lists: [{ id: 7 }], count: 40 }))
+  expect(await knowledgePage('/kb.know/lists?type=1', 2, 15)).toMatchObject({ rows: [{ id: 7 }], total: 40, page: 2, pageSize: 15 })
+  expect(String(fetcher.mock.calls[0]?.[0])).toContain('page_no=2&page_size=15')
 })
 it('maps server member identities and learning states without fabricated values', () => {
   expect(knowledgeTable([{ id: 0, sn: 42, nickname: 'Owner', power: 1, owned: 1 }], 'members')[0]).toMatchObject({ id: '0', sn: '42', role: 'owner' })
