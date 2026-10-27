@@ -54,14 +54,30 @@ export async function knowledgeRequest(
   if (!response.ok) throw new Error(`QZOS HTTP ${response.status}`)
   return result.data
 }
-/** Read every server page, preserving errors and refusing truncated pagination.
+/** Read one server page and retain its authoritative total for the pager.
+ * @param path - Business API path and query.
+ * @param page - One-based page number.
+ * @param pageSize - Requested rows per page.
+ * @param signal - Caller cancellation signal.
+ * @returns Validated rows plus pagination metadata.
+ */
+export async function knowledgePage(path: string, page: number, pageSize: number, signal?: AbortSignal): Promise<{ rows: LoginRecord[]; total: number; page: number; pageSize: number }> {
+  if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(pageSize) || pageSize < 1) throw new Error('Invalid QZOS pagination')
+  const data = loginRecord(await knowledgeRequest(`${path}${path.includes('?') ? '&' : '?'}page_no=${page}&page_size=${pageSize}`, undefined, signal))
+  const rows = knowledgeRows(data.lists)
+  const total = Number(data.count)
+  if (!Number.isSafeInteger(total) || total < 0) throw new Error('Invalid QZOS pagination')
+  return { rows, total, page, pageSize }
+}
+/** Read every server page with a bounded traversal; callers that can paginate should use knowledgePage.
  * @param path - Business API path and query.
  * @param signal - Caller cancellation signal.
  * @returns Validated response or mapped presentation value.
  */
 export async function knowledgePages(path: string, signal?: AbortSignal): Promise<LoginRecord[]> {
   const result: LoginRecord[] = []
-  for (let page = 1; ; page++) {
+  const maxPages = 100
+  for (let page = 1; page <= maxPages; page++) {
     const data = loginRecord(await knowledgeRequest(`${path}${path.includes('?') ? '&' : '?'}page_no=${page}&page_size=100`, undefined, signal))
     const rows = knowledgeRows(data.lists)
     const total = Number(data.count)
@@ -69,6 +85,7 @@ export async function knowledgePages(path: string, signal?: AbortSignal): Promis
     result.push(...rows)
     if (result.length >= total) return result
   }
+  throw new Error('QZOS pagination exceeded the page limit')
 }
 /** Read local connections/history even when new market requests are disabled.
  * @param signal - Owning resource lifetime.
@@ -103,6 +120,14 @@ export function installKnowledgeResources(ctx: Context): (panel: string) => void
         let value: LoginRecord
         const kind = url.pathname.slice(1)
         if (kind === 'list' || kind === 'employees') {
+          const all = url.searchParams.get('all') === '1'
+          const page = Math.max(1, Number(url.searchParams.get('page')) || 1)
+          const pageSize = Math.min(100, Math.max(1, Number(url.searchParams.get('page_size')) || 24))
+          const type = url.searchParams.get('type') ?? (kind === 'list' ? '1' : ' ')
+          const keyword = url.searchParams.get('keyword') ?? ''
+          const path = kind === 'list'
+            ? `/kb.know/lists?type=${encodeURIComponent(type)}`
+            : `/kb.robot/lists?type=${encodeURIComponent(type)}&keyword=${encodeURIComponent(keyword)}`
           do {
             // Subscribe before fetching so a refresh during the request queues one more read.
             let resume!: () => void
@@ -114,9 +139,15 @@ export function installKnowledgeResources(ctx: Context): (panel: string) => void
             })
             try {
               try {
-                const rows = await knowledgePages(kind === 'list' ? '/kb.know/lists?type=0' : '/kb.robot/lists', signal)
-                if (signal.aborted) return
-                yield { ok: true as const, value: { rows } }
+                if (all) {
+                  const rows = await knowledgePages(path, signal)
+                  if (signal.aborted) return
+                  yield { ok: true as const, value: { rows, total: rows.length, page: 1, pageSize: rows.length } }
+                } else {
+                  const result = await knowledgePage(path, page, pageSize, signal)
+                  if (signal.aborted) return
+                  yield { ok: true as const, value: result }
+                }
               } catch (error) {
                 if (signal.aborted) return
                 yield { ok: false as const, error: Object.assign(new Error(error instanceof Error ? error.message : 'QZOS request failed'), { code: 'gateway/internal' as const, details: {}, isDSHRemoteError: true as const }) }

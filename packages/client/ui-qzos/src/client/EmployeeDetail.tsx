@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { Button, Input, Modal, IconChevronLeftOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PanelProps } from './Panel.tsx'
-import { catalogs, type Example } from './catalog.ts'
+import type { Example } from './catalog.ts'
 import type { PreviewRow } from './resource-fixtures.ts'
 import { resourceDraft, type PreviewValues, type ResourceForm } from './resource-schema.ts'
 import { EmployeeBindings } from './EmployeeBindings.tsx'
@@ -21,7 +21,6 @@ import { publicVisitorApi, loginRecord, storedLogin, type LoginRecord } from './
 import { EmployeeMenuImages } from './EmployeeMenuImages.tsx'
 import type { QzosKey } from './locales.ts'
 
-const emptyRows: readonly PreviewRow[] = []
 type EmployeeDetailProps = PanelProps & {
   item: Example
   section: string
@@ -30,7 +29,7 @@ type EmployeeDetailProps = PanelProps & {
   modelDefaults: PreviewValues
   modelOptions: Record<string, { value: string; label: string; disabled?: boolean }[]>
 }
-type EmployeeDialog = { kind: 'menu' | 'share' | 'api' | 'quota' | 'keys' | 'feedback' | 'reply' | 'correct' | 'binding'; row?: PreviewRow; readOnly?: boolean }
+type EmployeeDialog = { kind: 'menu' | 'share' | 'api' | 'quota' | 'keys' | 'feedback' | 'reply' | 'correct'; row?: PreviewRow; readOnly?: boolean }
 
 /** Load the full configuration before allowing writes to existing fields. */
 export function EmployeeDetail(props: EmployeeDetailProps) {
@@ -94,9 +93,8 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
   const usageResource = useResource<'qzos-knowledge'>(section === 'dialogue' && dialogueTab === 'data' ? `dsh-resource://qzos-knowledge/employee-usage?${query}` : '')
   const keysResource = useResource<'qzos-knowledge'>(dialog?.kind === 'keys' && dialog.row ? `dsh-resource://qzos-knowledge/employee-keys?id=${dialog.row.id}&epoch=${epoch}&revision=${revision}` : '')
   const keys = keysResource.value ? knowledgeRows(keysResource.value.rows) : []
-  const shares: PreviewRow[] = publicationResource.value ? knowledgeRows(publicationResource.value.rows).map(row => ({ ...knowledgeDraft(row), id: knowledgeText(row.id), name: knowledgeText(row.name), entryId: knowledgeText(row.apikey), key: '', password: row.has_password ? 'protected' : '', status: row.status === 'active' ? 'enabled' : 'disabled', lastUsed: knowledgeText(row.use_time), mode: '' })) : []
+  const shares: PreviewRow[] = publicationResource.value ? knowledgeRows(publicationResource.value.rows).map(row => ({ ...knowledgeDraft(row), id: knowledgeText(row.id), name: knowledgeText(row.name), entryId: knowledgeText(row.apikey), key: '', password: row.has_password ? 'protected' : '', status: row.status === 'active' ? 'enabled' : 'disabled', lastUsed: knowledgeText(row.use_time), mode: Number(row.type) === 2 ? 'js' : 'web' })) : []
   const dialogues: PreviewRow[] = recordResource.value ? knowledgeRows(recordResource.value.rows).map(row => ({ ...knowledgeDraft(row), id: knowledgeText(row.id), name: knowledgeText(row.ask), question: knowledgeText(row.ask), answer: knowledgeText(row.reply), questionTime: knowledgeText(row.create_time), userInfo: knowledgeText(loginRecord(row.user).nickname), reviewed: Number(row.is_feedback) === 1 ? '1' : '0' })) : []
-  const bindings = emptyRows
   const perform = async (work: () => Promise<void>) => {
     if (pending.current) return
     pending.current = true; setBusy(true); setNotice('')
@@ -156,14 +154,14 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
   }) }
   const remove = () => { void perform(async () => {
     if (!confirmation) return
-    if (confirmation.key === menusKey) setMenuValues(current => current.filter((_, index) => !confirmation.ids.includes(String(index))))
+    if (confirmation.key === menusKey) { setMenuValues(current => current.filter((_, index) => !confirmation.ids.includes(String(index)))); setNotice(t('employeeMenuUnsaved')) }
     else if (confirmation.key === dialoguesKey) await request('/kb.chat/dataDelete', { robot_id: Number(item.id), ids: confirmation.ids.map(Number) })
     else if (confirmation.key === sharesKey) for (const id of confirmation.ids) await request('/kb.share/del', { id: Number(id), type: publicationType })
     else { unsupported(); return }
     setConfirmation(null); setSelected([]); refresh()
   }) }
   const dialogueRows = dialogues.filter(row => feedbackFilter === 'all' || row.reviewed === (feedbackFilter === 'reviewed' ? '1' : '0'))
-  const dialogTitle: ResourceText = dialog?.kind === 'binding' ? dialogDraft.kind === 'skill' ? 'bindSkill' : 'bindPlugin' : dialog?.kind === 'menu' ? 'addMenu' : dialog?.kind === 'share' ? 'createLink'
+  const dialogTitle: ResourceText = dialog?.kind === 'menu' ? 'addMenu' : dialog?.kind === 'share' ? 'createLink'
     : dialog?.kind === 'api' ? 'createApi' : dialog?.kind === 'quota' ? 'usageSettings' : dialog?.kind === 'keys' ? 'manageKeys'
       : dialog?.kind === 'feedback' ? 'questionFeedback' : dialog?.kind === 'correct' ? 'correct' : 'viewReply'
   const form: ResourceForm = dialog?.kind === 'menu' ? 'menu' : dialog?.kind === 'correct' ? 'fragment' : 'share'
@@ -211,8 +209,8 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
       {!channel ? platformGroups.map(([group, platforms]) => <div key={group}><h3>{r(group)}</h3><div className={css.platformGrid}>{platforms.map(platform => <button type="button" key={platform} disabled={['api', 'oa', 'qwx', 'rpa'].includes(platform)} onClick={() =>{  setChannel(platform === 'poster' ? 'web' : platform) }}><img src={publicationArtwork[platform as keyof typeof publicationArtwork]} alt="" /><span>{r(platform)}<small>{t(`pcPlatform${platform}` as QzosKey)}</small>{['api', 'oa', 'qwx', 'rpa'].includes(platform) && <small>{platform === 'api' ? t('employeeApiDeferred') : r('comingSoon')}</small>}</span></button>)}</div></div>)
         : <><Button onClick={() =>{  setChannel('') }}><IconChevronLeftOutlineRegular size={16} />{r(channel === 'api' ? 'api' : channel === 'js' ? 'js' : 'web')}</Button><p className={css.notice}>{r('webHint')}</p>
           <div className={css.toolbar}><Button variant="primary" disabled={busy} onClick={() => { show(channel === 'api' ? 'api' : 'share') }}>{r(channel === 'api' ? 'createApi' : 'createLink')}</Button></div>
-          <ResourceTable rows={shares} r={r} columns={channel === 'api' ? [['status', 'status'], ['key', 'appSecret'], ['name', 'name'], ['lastUsed', 'lastUsed']] : [['status', 'status'], ['entryId', 'entryId'], ['name', 'shareName'], ['password', 'password'], ['mode', 'mode'], ['lastUsed', 'lastUsed']]}
-            cell={(row, key) => key === 'status' ? r(row.status === 'enabled' ? 'enabled' : 'disabled') : key === 'password' ? row.password ? '••••••' : '—' : row[key] ?? '—'} actions={row => [
+          <ResourceTable rows={shares} r={r} columns={channel === 'api' ? [['status', 'status'], ['name', 'name'], ['lastUsed', 'lastUsed']] : [['status', 'status'], ['entryId', 'entryId'], ['name', 'shareName'], ['password', 'password'], ['mode', 'mode'], ['lastUsed', 'lastUsed']]}
+            cell={(row, key) => key === 'status' ? r(row.status === 'enabled' ? 'enabled' : 'disabled') : key === 'password' ? row.password ? '••••••' : '—' : key === 'mode' ? r(row.mode === 'js' ? 'js' : 'web') : row[key] ?? '—'} actions={row => [
               { label: row.status === 'enabled' ? 'deactivate' : 'enabled', run: () => { void perform(async () => { await request('/kb.publish/manage', { id: Number(row.id), action: row.status === 'enabled' ? 'disable' : 'enable' }); refresh() }) } },
               ...channel === 'api' ? [{ label: 'manageKeys' as const, run: () =>{  show('keys', row) } }] : [{ label: 'copyLink' as const, run: () => { void perform(async () => { await navigator.clipboard.writeText(publicationUrl(publicVisitorApi, row.entryId ?? '', Number(row.type))); setNotice(t('publicationCopied')) }) } }, { label: 'edit' as const, run: () =>{  show('share', row) } }, { label: 'preview' as const, run: () => { setPublicArtifact({ row, poster: false }) } }, ...channel === 'js' ? [{ label: 'js' as const, run: () => { setPublicArtifact({ row, poster: false }) } }] : [{ label: 'generatePoster' as const, run: () => { setPublicArtifact({ row, poster: true }) } }]],
               { label: 'usageSettings', run: () =>{  show('quota', row) } }, { label: 'delete', run: () =>{  setConfirmation({ key: sharesKey, ids: [row.id] }) } },
@@ -258,8 +256,7 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
     </Modal>
     <Modal open={dialog !== null} onClose={() => { setIssuedKey(''); setDialog(null) }} closeLabel={r('close')} title={r(dialogTitle)} className={`${css.dialog} ${css.employeeDialog}`}
       footer={<><Button variant="outline" onClick={() => { setIssuedKey(''); setDialog(null) }}>{r('cancel')}</Button>{dialog?.kind !== 'keys' && <Button variant="primary" disabled={busy || menuImageLoading} onClick={saveDialog}>{r('confirm')}</Button>}</>}>
-      {dialog?.kind === 'binding' ? <div className={css.checkList}>{catalogs.skills.map(record => <label key={record.id}><input type="radio" name="qzos-binding" disabled={bindings.some(binding => binding.targetId === record.id)} checked={dialogDraft.binding === record.id} onChange={() =>{  setDialogDraft(current => ({ ...current, binding: record.id })) }} />{record.title}</label>)}</div>
-        : dialog?.kind === 'keys' ? <>
+      {dialog?.kind === 'keys' ? <>
           <p className={css.notice}>{r('secretHint')}</p>
           <select value={selectedKey} aria-label={r('manageKeys')} onChange={(event) => { setSelectedKey(event.target.value); setIssuedKey('') }}><option value="">—</option>{keys.map(key => <option key={knowledgeText(key.id)} value={knowledgeText(key.id)}>{knowledgeText(key.name)} · {knowledgeText(key.key_prefix)} · {knowledgeText(key.status)}</option>)}</select>
           <div className={css.toolbar}>{(['createKey', 'rotate', 'deactivate', 'recentCalls'] as const).map(command => <Button key={command} disabled={busy || ((command === 'rotate' || command === 'deactivate') && !selectedKey)} onClick={() => { void perform(async () => {
@@ -272,7 +269,7 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
           {issuedKey && <div className={css.result}><code>{issuedKey}</code><Button onClick={() => { void navigator.clipboard.writeText(issuedKey).catch(() => { setNotice(t('errorHint')) }) }}>{r('copySecret')}</Button></div>}
           {calls && <div>{calls.length === 0 ? r('empty') : calls.map((row, index) => <p key={index}>{knowledgeText(row.request_id)} · {knowledgeText(row.state)} · {knowledgeText(row.error_code)}</p>)}</div>}
         </>
-          : dialog?.kind === 'quota' ? <div className={css.formFields}>{(['quotaDaily', 'quotaTotal'] as const).map(key => <label key={key}>{r(key)}<Input type="number" min={0} value={dialogDraft[key] ?? '0'} onChange={(event) =>{  setDialogDraft(current => ({ ...current, [key]: event.target.value })) }} /></label>)}<label>{r('expiresAt')}<Input disabled type="date" value={dialogDraft.expiresAt ?? ''} onChange={(event) =>{  setDialogDraft(current => ({ ...current, expiresAt: event.target.value })) }} /></label></div>
+          : dialog?.kind === 'quota' ? <div className={css.formFields}>{(['quotaDaily', 'quotaTotal'] as const).map(key => <label key={key}>{r(key)}<Input type="number" min={0} value={dialogDraft[key] ?? '0'} onChange={(event) =>{  setDialogDraft(current => ({ ...current, [key]: event.target.value })) }} /></label>)}</div>
             : dialog?.kind === 'feedback' ? <><select aria-label={r('feedback')} value={dialogDraft.feedback_type} onChange={(event) => { setDialogDraft(current => ({ ...current, feedback_type: event.target.value, feedback_key: randomUUID() })) }}>{(['like', 'dislike', 'correction', 'miss'] as const).map(type => <option key={type} value={type}>{t(({ like: 'feedbackLike', dislike: 'feedbackDislike', correction: 'feedbackCorrection', miss: 'feedbackMiss' } as const)[type])}</option>)}</select>{dialogDraft.feedback_type === 'correction' && <label>{r('feedbackContent')}<textarea className={css.textArea} rows={5} value={dialogDraft.feedback ?? ''} onChange={(event) =>{  setDialogDraft(current => ({ ...current, feedback: event.target.value })) }} /></label>}</>
               : dialog?.kind === 'reply' ? <><strong>{dialog.row?.question}</strong><p>{dialog.row?.answer}</p></>
                 : dialog?.kind === 'api' ? <label>{r('name')}<Input value={dialogDraft.name ?? ''} onChange={(event) =>{  setDialogDraft(current => ({ ...current, name: event.target.value })) }} /></label>
@@ -286,6 +283,6 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
       {notice && <p role="alert">{notice}</p>}
     </Modal>
     <Modal className={css.employeeDialog as string} open={confirmation !== null} onClose={() =>{  setConfirmation(null) }} closeLabel={r('close')} title={r('deleteConfirm')} description={r('deleteHint')}
-      footer={<><Button variant="outline" onClick={() =>{  setConfirmation(null) }}>{r('cancel')}</Button><Button variant="primary" disabled={busy} onClick={remove}>{r('confirmDelete')}</Button></>} />
+      footer={<><Button variant="outline" onClick={() =>{  setConfirmation(null) }}>{r('cancel')}</Button><Button variant="outline" className={css.dangerAction} disabled={busy} onClick={remove}>{r('confirmDelete')}</Button></>} />
   </div>
 }

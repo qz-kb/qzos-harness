@@ -47,19 +47,33 @@ function EmployeeCard({ item, onCommand, labels }: EmployeeCardProps) {
 
 /** Preserve QZOS lists, resource dialogs and the detail sidebar using authenticated business resources. */
 export function ResourcePanel(props: ResourcePanelProps) {
-  const { panel, useStore, actions, t, openEmployee, syncEmployees } = props
+  const { panel, useStore, actions, t, openEmployee } = props
   const r = (key: ResourceText) => key === 'saved' ? t('kbSaved') : t(resourceCopy[key])
   const epoch = useStore(state => state.businessEpoch)
   const revision = useStore(state => state.knowledgeRevision)
-  const remote = props.useResource<'qzos-knowledge'>(`dsh-resource://qzos-knowledge/${panel === 'knowledge' ? 'list' : 'employees'}?epoch=${epoch}&revision=${revision}`)
+  const filter = useStore(state => state.filters[panel] ?? (panel === 'knowledge' ? 'owned' : 'all'))
+  const query = useStore(state => state.queries[panel] ?? '')
+  const [page, setPage] = useState(1)
+  const pageSize = 24
+  useEffect(() => { setPage(1) }, [panel, filter, query, epoch])
+  const listParams = new URLSearchParams({ epoch: String(epoch), revision: String(revision), page: String(page), page_size: String(pageSize) })
+  if (panel === 'knowledge') listParams.set('type', filter === 'shared' ? '2' : '1')
+  else {
+    listParams.set('type', filter === 'public' ? '1' : filter === 'private' ? '0' : ' ')
+    listParams.set('keyword', query)
+  }
+  const remote = props.useResource<'qzos-knowledge'>(`dsh-resource://qzos-knowledge/${panel === 'knowledge' ? 'list' : 'employees'}?${listParams.toString()}`)
   const records = remote.value ? knowledgeRows(remote.value.rows).map(panel === 'knowledge' ? knowledgeCard : employeeCard) : []
+  const total = Number(remote.value?.total ?? records.length)
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  useEffect(() => { if (page > totalPages) setPage(totalPages) }, [page, totalPages])
   const [configuration, setConfiguration] = useState<{ id: string | null } | null>(null)
   const selected = useStore(state => state.details[panel])
   const [nestedKnowledge, setNestedKnowledge] = useState<PreviewValues | null>(null)
   const [nestedKnowledgeId, setNestedKnowledgeId] = useState<string | null>(null)
   const [createdKnowledge, setCreatedKnowledge] = useState<Example | null>(null)
   const optionsRemote = props.useResource<'qzos-knowledge'>(configuration || selected ? `dsh-resource://qzos-knowledge/models?epoch=${epoch}&revision=${revision}` : '')
-  const linkedRemote = props.useResource<'qzos-knowledge'>(panel === 'employees' ? `dsh-resource://qzos-knowledge/list?epoch=${epoch}&revision=${revision}` : '')
+  const linkedRemote = props.useResource<'qzos-knowledge'>(panel === 'employees' ? `dsh-resource://qzos-knowledge/list?epoch=${epoch}&revision=${revision}&all=1` : '')
   const models = optionsRemote.value ? loginRecord(optionsRemote.value.models) : {}
   const defaults = resourceModelDefaults(models)
   useEffect(() => { props.refreshCatalog(panel) }, [panel, props.refreshCatalog])
@@ -91,15 +105,13 @@ export function ResourcePanel(props: ResourcePanelProps) {
   }
   const knowledge = linkedRemote.value ? knowledgeRows(linkedRemote.value.rows).map(knowledgeCard) : []
   if (createdKnowledge && !knowledge.some(item => item.id === createdKnowledge.id)) knowledge.push(createdKnowledge)
-  const filter = useStore(state => state.filters[panel] ?? (panel === 'knowledge' ? 'owned' : 'all'))
-  const query = useStore(state => state.queries[panel] ?? '')
   const section = useStore(state => state.sections[panel] ?? (panel === 'knowledge' ? 'dataStudy' : 'edit'))
   const [search, setSearch] = useState(query)
   const [draft, setDraft] = useState<PreviewValues>({})
   const [deleting, setDeleting] = useState<Example | null>(null)
   const [notice, setNotice] = useState('')
   const item = records.find(record => record.id === selected)
-  const filtered = records.filter(record => (filter === 'all' || record.scope === filter) && record.title.toLowerCase().includes(query.trim().toLowerCase()))
+  const filtered = records
   const configure = (record?: Example) => {
     if (panel === 'knowledge') {
       void perform(async () => {
@@ -153,7 +165,7 @@ export function ResourcePanel(props: ResourcePanelProps) {
         <div className={css.listRefresh}><Button aria-label={r('refresh')} onClick={() => { props.refreshCatalog(panel) }}>{r('refresh')}</Button></div>
         {notice && <p className={css.notice} role="status">{notice}</p>}
         {panel === 'knowledge' ? <div className={css.kbGrid}>
-          {filter === 'owned' && <button className={css.kbCreate} type="button" onClick={() =>{  configure() }}><IconPlusOutlineRegular size={24} />{r('newKnowledge')}</button>}
+          {filter === 'owned' && page === 1 && <button className={css.kbCreate} type="button" onClick={() =>{  configure() }}><IconPlusOutlineRegular size={24} />{r('newKnowledge')}</button>}
           {!remote.value && remote.status === 'loading' && <div className={css.cardSkeleton} role="status" aria-label={t('catalogLoading')} />}
           {filtered.map(record => <article className={css.kbCard} key={record.id}>
             <div className={css.kbCover}>
@@ -168,7 +180,12 @@ export function ResourcePanel(props: ResourcePanelProps) {
           {!remote.value && remote.status === 'loading' && <div className={css.cardSkeleton} role="status" aria-label={t('catalogLoading')} />}
           {filtered.map(record => <EmployeeCard key={record.id} item={record} onCommand={employeeCommand} labels={{ public: r('public'), private: r('private'), more: r('more'), settings: r('settings'), chat: r('chat'), publish: r('publishEmployee'), dialogue: r('dialogue'), delete: r('delete'), noIntro: t('employeeNoIntro') }} />)}
         </div>}
-        {filtered.length === 0 && remote.status === 'live' && <p className={css.empty}>{r('empty')}</p>}
+        {total === 0 && remote.status === 'live' && <p className={css.empty}>{r('empty')}</p>}
+        {total > pageSize && <div className={css.pager}>
+          <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => { setPage(current => Math.max(1, current - 1)) }}>{r('previous')}</Button>
+          <span>{page} / {totalPages}</span>
+          <Button size="sm" variant="outline" disabled={page >= totalPages} onClick={() => { setPage(current => Math.min(totalPages, current + 1)) }}>{r('next')}</Button>
+        </div>}
       </>}
     </> : <div className={css.detailLayout}>
       <aside className={css.aside}>
@@ -205,6 +222,6 @@ export function ResourcePanel(props: ResourcePanelProps) {
       }) }}><ResourceFields t={t} form="knowledgeCreate" draft={{ ...defaults, ...nestedKnowledge }} options={modelOptions} disabled={busy || nestedKnowledgeId !== null || optionsRemote.status !== 'live'} onChange={(key, value) => { setNestedKnowledge(current => ({ ...current, [key]: value })) }} knowledge={[]} /></form>
     </Modal>
     <Modal open={deleting !== null} onClose={() =>{  setDeleting(null) }} closeLabel={r('close')} title={r('deleteConfirm')} className={css.dialog as string}
-      footer={<><Button variant="outline" onClick={() =>{  setDeleting(null) }}>{r('cancel')}</Button><Button variant="primary" onClick={() => { if (deleting) { const id = deleting.id; void perform(async () => { await knowledgeRequest(panel === 'knowledge' ? '/kb.know/del' : '/kb.robot/del', { id: Number(id) }); actions.setDetail(panel, null); actions.refreshKnowledge(); if (panel === 'employees') syncEmployees(records.filter(record => record.id !== id)); setDeleting(null) }) } }}>{r('confirmDelete')}</Button></>}><p className={css.deletePrompt}>{t('knowledgeDeletePrompt')} {deleting?.title}？</p>{notice && <p role="alert">{notice}</p>}</Modal>
+      footer={<><Button variant="outline" onClick={() =>{  setDeleting(null) }}>{r('cancel')}</Button><Button variant="outline" className={css.dangerAction} onClick={() => { if (deleting) { const id = deleting.id; void perform(async () => { await knowledgeRequest(panel === 'knowledge' ? '/kb.know/del' : '/kb.robot/del', { id: Number(id) }); actions.setDetail(panel, null); actions.refreshKnowledge(); setDeleting(null) }) } }}>{r('confirmDelete')}</Button></>}><p className={css.deletePrompt}>{t('knowledgeDeletePrompt')} {deleting?.title}？</p>{notice && <p role="alert">{notice}</p>}</Modal>
   </section>
 }
