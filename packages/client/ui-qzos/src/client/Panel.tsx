@@ -5,7 +5,7 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsStore, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { createQzosStore } from './store.ts'
-import { type Example, type Panel } from './catalog.ts'
+import { type Panel } from './catalog.ts'
 import css from './Panel.module.css'
 import { ResourcePanel } from './ResourcePanel.tsx'
 import { CapabilityPanel } from './CapabilityPanel.tsx'
@@ -17,7 +17,6 @@ export type PanelProps = Copy & View & Pick<PropsRuntime<'main'>, 'useResource'>
   refreshCatalog: (panel: string) => void
   developer: boolean
   openEmployee: (id: string, title?: string) => Promise<string | undefined>
-  syncEmployees: (employees: readonly Example[]) => void
 }
 const icons = {
   knowledge: IconFolderOpenOutlineRegular, employees: IconUsersOutlineRegular,

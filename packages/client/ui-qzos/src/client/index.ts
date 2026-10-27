@@ -51,7 +51,7 @@ export function apply(ctx: Context): void {
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({ name: 'shell.overlay', id: 'qzos-login', locale: 'qzos', store }, Login))
   for (const [order, panel] of panels.entries()) {
     const id = `qzos-${panel}` as MainPanelId
-    ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: id, locale: 'qzos', store, inject: () => ({ panel, developer, refreshCatalog, openEmployee, syncEmployees: openEmployee.update }) }, QzosPanel))
+    ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: id, locale: 'qzos', store, inject: () => ({ panel, developer, refreshCatalog, openEmployee }) }, QzosPanel))
     ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id, order: order - 100, label: () => t(panel), inject: () => ({ panel }) }, PanelIcon))
   }
   ctx.slots.inject('main', () => {

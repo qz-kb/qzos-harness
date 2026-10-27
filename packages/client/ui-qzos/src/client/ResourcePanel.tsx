@@ -139,7 +139,7 @@ export function ResourcePanel(props: ResourcePanelProps) {
     : [['edit', 'employeeSettings'], ['release', 'employeeRelease'], ['dialogue', 'dialogue'], ['chat', 'immediateChat']]
   const save = () => {
     if (!configuration || !draft.name?.trim()) return
-    if (panel === 'knowledge') { void perform(async () => { await saveKnowledge(configuration.id, { ...defaults, ...draft }, lifetime.signal); actions.refreshKnowledge(); setConfiguration(null); setNotice(r('saved')) }); return }
+    if (panel === 'knowledge') { void perform(async () => { await saveKnowledge(configuration.id, { ...defaults, ...draft }, lifetime.signal); actions.refreshKnowledge(); setPage(1); setConfiguration(null); setNotice(r('saved')) }); return }
     void perform(async () => {
       const image = await employeeImage(draft.image ?? '', lifetime.signal, credential.current)
       const result = configuration.id ? { id: configuration.id } : loginRecord(await knowledgeRequest('/kb.robot/add', { name: draft.name, intro: draft.intro ?? '', ...image ? { image } : {} }))
@@ -149,7 +149,7 @@ export function ResourcePanel(props: ResourcePanelProps) {
       const detail = loginRecord(await knowledgeRequest(`/kb.robot/detail?id=${id}`))
       const fullDraft = { ...employeeDraft(detail), ...draft, ...defaults, model_id: draft.model_id ?? defaults.documents_model_id ?? '0:0', image: image || knowledgeText(detail.image) }
       await saveEmployee(detail, fullDraft, knowledgeRows(detail.menus), lifetime.signal)
-      actions.refreshKnowledge(); setConfiguration(null); actions.setDetail(panel, id); actions.setSection(panel, 'edit'); setNotice(t('kbSaved'))
+      actions.refreshKnowledge(); setPage(1); setConfiguration(null); actions.setDetail(panel, id); actions.setSection(panel, 'edit'); setNotice(t('kbSaved'))
     })
   }
   return <section className={`${css.page} ${panel === 'knowledge' ? css.knowledgePage : css.employeePage}`} data-qzos-panel={panel}>
