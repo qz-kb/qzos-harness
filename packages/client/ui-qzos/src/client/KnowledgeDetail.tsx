@@ -9,7 +9,7 @@ import { resourceDraft, type PreviewValues, type ResourceForm } from './resource
 import { ResourceFields } from './ResourceForms.tsx'
 import { ResourceTable } from './ResourceTable.tsx'
 import { resourceCopy, type ResourceText } from './resource-copy.ts'
-import { knowledgeRequest as requestKnowledge, knowledgeRows, knowledgeText, knowledgeSearchInput, knowledgeDraft, knowledgeTable, saveKnowledge, knowledgeLearningPending } from './knowledge-client.ts'
+import { knowledgeRequest as requestKnowledge, knowledgeRows, knowledgeText, knowledgeSearchInput, knowledgeDraft, knowledgeTable, saveKnowledge, knowledgeLearningPending, knowledgeCard } from './knowledge-client.ts'
 import { loginRecord, storedLogin } from './login-client.ts'
 import { KnowledgeParse } from './KnowledgeParse.tsx'
 import { KnowledgeFile } from './KnowledgeFile.tsx'
@@ -22,7 +22,6 @@ import css from './Resources.module.css'
 type KnowledgeDetailProps = PanelProps & {
   item: Example
   section: string
-  knowledge: Example[]
   onDelete: () => void
   modelOptions: Record<string, { value: string; label: string; disabled?: boolean }[]> }
 type Dialog = { kind: 'rename' | 'fragment' | 'member' | 'acl' | 'parameters' | 'transfer'; row?: PreviewRow }
@@ -37,7 +36,7 @@ export function KnowledgeDetail(props: KnowledgeDetailProps) {
   return <KnowledgeContent {...props} detail={detail} />
 }
 function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string, unknown> }) {
-  const { item, section, useStore, useResource, actions, t, onDelete, modelOptions, detail, knowledge } = props
+  const { item, section, useStore, useResource, actions, t, onDelete, modelOptions, detail } = props
   const r = (key: ResourceText) => key === 'saved' || key === 'settingsSaved' ? t('kbSaved') : t(resourceCopy[key])
   const [lifetime] = useState(() => new AbortController())
   const credential = useRef(storedLogin(sessionStorage))
@@ -93,6 +92,8 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
   const documentsResource = useResource<'qzos-knowledge'>(section === 'dataStudy' || section === 'testData' ? `dsh-resource://qzos-knowledge/files?id=${item.id}&epoch=${epoch}&revision=${revision}&page=${documentsPage}&page_size=15&keyword=${encodeURIComponent(search)}` : '')
   const fragmentsResource = useResource<'qzos-knowledge'>(document && mode === 'fragments' ? `dsh-resource://qzos-knowledge/fragments?id=${item.id}&fd=${document.id}&epoch=${epoch}&revision=${revision}&page=${fragmentsPage}&page_size=15&keyword=${encodeURIComponent(search)}&status=${status === 'all' ? '' : status === 'waitingLearn' ? '0' : status === 'learning' ? '1' : status === 'failedLearn' ? '3' : '2'}` : '')
   const membersResource = useResource<'qzos-knowledge'>(section === 'teamData' || dialog?.kind === 'acl' ? `dsh-resource://qzos-knowledge/members?id=${item.id}&epoch=${epoch}&revision=${revision}` : '')
+  const correctionResource = useResource<'qzos-knowledge'>(dialog?.kind === 'correct' ? `dsh-resource://qzos-knowledge/list?epoch=${epoch}&revision=${revision}&all=1` : '')
+  const knowledge = correctionResource.value ? knowledgeRows(correctionResource.value.rows).map(knowledgeCard) : []
   const capabilitiesResource = useResource<'qzos-knowledge'>(mode === 'import' ? `dsh-resource://qzos-knowledge/import-capabilities?epoch=${epoch}&revision=${revision}` : '')
   const capabilities = loginRecord(capabilitiesResource.value?.capabilities ?? {})
   const importOptions = knowledgeImportOptions(capabilities, importType)
