@@ -239,7 +239,7 @@ export function installKnowledgeResources(ctx: Context): (panel: string) => void
             value = { ...result, learning: loginRecord(learning), qa: loginRecord(qa) }; break
           }
           case 'import-capabilities': value = { capabilities: loginRecord(await knowledgeRequest('/kb.teach/importCapabilities', undefined, signal)) }; break
-          case 'member-options': value = { rows: await knowledgePages(`/kb.know/teamUsers?kb_id=${encodeURIComponent(id)}&keyword=${encodeURIComponent(url.searchParams.get('query') ?? '')}`, signal) }; break
+          case 'member-options': value = await knowledgePage(`/kb.know/teamUsers?kb_id=${encodeURIComponent(id)}&keyword=${encodeURIComponent(url.searchParams.get('query') ?? '')}`, page, pageSize, signal); break
           case 'members': {
             const [result, profile] = await Promise.all([
               knowledgePage(`/kb.know/teamLists?kb_id=${encodeURIComponent(id)}`, page, pageSize, signal),

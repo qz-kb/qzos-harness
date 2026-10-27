@@ -16,6 +16,7 @@ export function KnowledgeMembers({ kb, onClose, onSaved, ...props }: PanelProps 
   const { t } = props
   const epoch = props.useStore(state => state.businessEpoch)
   const [query, setQuery] = useState('')
+  const [page, setPage] = useState(1)
   const [revision, setRevision] = useState(0)
   const [selected, setSelected] = useState<Record<string, { user: LoginRecord; power: number }>>({})
   const [busy, setBusy] = useState(false)
@@ -24,8 +25,11 @@ export function KnowledgeMembers({ kb, onClose, onSaved, ...props }: PanelProps 
   const [lifetime] = useState(() => new AbortController())
   const token = useRef(storedLogin(sessionStorage))
   useEffect(() => () => { lifetime.abort() }, [lifetime])
-  const remote = props.useResource<'qzos-knowledge'>(`dsh-resource://qzos-knowledge/member-options?id=${encodeURIComponent(kb)}&query=${encodeURIComponent(query)}&epoch=${epoch}&revision=${revision}`)
+  useEffect(() => { setPage(1) }, [query, kb])
+  const remote = props.useResource<'qzos-knowledge'>(`dsh-resource://qzos-knowledge/member-options?id=${encodeURIComponent(kb)}&query=${encodeURIComponent(query)}&epoch=${epoch}&revision=${revision}&page=${page}&page_size=15`)
   const users = remote.value ? knowledgeRows(remote.value.rows) : []
+  const total = Number(remote.value?.total ?? users.length)
+  const pages = Math.max(1, Math.ceil(total / 15))
   const eligible = users.filter(user => !Number(user.is_added))
   const toggle = (user: LoginRecord, checked: boolean) => {
     const sn = knowledgeText(user.sn)
@@ -53,6 +57,7 @@ export function KnowledgeMembers({ kb, onClose, onSaved, ...props }: PanelProps 
         {user.avatar ? <img className={css.memberAvatar} src={knowledgeText(user.avatar)} alt="" /> : <IconUsersOutlineRegular size={24} />}
         <span>{knowledgeText(user.nickname)} {Number(user.is_added) ? <small>{t('knowledgeMemberAdded')}</small> : null}</span>
       </label>)}
+      {total > 15 && <div className={css.pager}><Button size="sm" variant="outline" disabled={page <= 1} onClick={() => { setPage(current => Math.max(1, current - 1)) }}>{t(resourceCopy.previous)}</Button><span>{page} / {pages}</span><Button size="sm" variant="outline" disabled={page >= pages} onClick={() => { setPage(current => Math.min(pages, current + 1)) }}>{t(resourceCopy.next)}</Button></div>}
     </div><div><strong>{t('knowledgeSelectedMembers')}：{Object.keys(selected).length}</strong>
       {Object.entries(selected).map(([sn, { user, power }]) => <div key={sn} className={css.memberOption}><span>{knowledgeText(user.nickname)}</span><select aria-label={`${t(resourceCopy.defaultPermission)} · ${knowledgeText(user.nickname)}`} disabled={busy} value={power} onChange={(event) => { const next = Number(event.target.value); setSelected(current => ({ ...current, [sn]: { user, power: next } })) }}>
         <option value={3}>{t(resourceCopy.viewPermission)}</option>
