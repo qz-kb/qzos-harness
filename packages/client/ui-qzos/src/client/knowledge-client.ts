@@ -241,11 +241,18 @@ export function installKnowledgeResources(ctx: Context): (panel: string) => void
           case 'import-capabilities': value = { capabilities: loginRecord(await knowledgeRequest('/kb.teach/importCapabilities', undefined, signal)) }; break
           case 'member-options': value = { rows: await knowledgePages(`/kb.know/teamUsers?kb_id=${encodeURIComponent(id)}&keyword=${encodeURIComponent(url.searchParams.get('query') ?? '')}`, signal) }; break
           case 'members': {
-            const [rows, profile] = await Promise.all([
-              knowledgeRequest(`/kb.know/teamLists?kb_id=${encodeURIComponent(id)}`, undefined, signal),
+            const [result, profile] = await Promise.all([
+              knowledgePage(`/kb.know/teamLists?kb_id=${encodeURIComponent(id)}`, page, pageSize, signal),
               knowledgeRequest('/user/info', undefined, signal),
             ])
-            value = { rows: knowledgeRows(rows), currentSn: knowledgeText(loginRecord(profile).sn) }; break
+            value = { ...result, currentSn: knowledgeText(loginRecord(profile).sn) }; break
+          }
+          case 'members-all': {
+            const [rows, profile] = await Promise.all([
+              knowledgePages(`/kb.know/teamLists?kb_id=${encodeURIComponent(id)}`, signal),
+              knowledgeRequest('/user/info', undefined, signal),
+            ])
+            value = { rows, currentSn: knowledgeText(loginRecord(profile).sn) }; break
           }
           default: throw new Error('Unknown QZOS resource')
         }

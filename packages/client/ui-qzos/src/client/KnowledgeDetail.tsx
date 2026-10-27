@@ -47,6 +47,7 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
   const [document, setDocument] = useState<PreviewRow | null>(null)
   const [documentsPage, setDocumentsPage] = useState(1)
   const [fragmentsPage, setFragmentsPage] = useState(1)
+  const [membersPage, setMembersPage] = useState(1)
   const [query, setQuery] = useState('')
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
@@ -91,7 +92,8 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
   const membersKey = `${item.id}:members`
   const documentsResource = useResource<'qzos-knowledge'>(section === 'dataStudy' || section === 'testData' ? `dsh-resource://qzos-knowledge/files?id=${item.id}&epoch=${epoch}&revision=${revision}&page=${documentsPage}&page_size=15&keyword=${encodeURIComponent(search)}` : '')
   const fragmentsResource = useResource<'qzos-knowledge'>(document && mode === 'fragments' ? `dsh-resource://qzos-knowledge/fragments?id=${item.id}&fd=${document.id}&epoch=${epoch}&revision=${revision}&page=${fragmentsPage}&page_size=15&keyword=${encodeURIComponent(search)}&status=${status === 'all' ? '' : status === 'waitingLearn' ? '0' : status === 'learning' ? '1' : status === 'failedLearn' ? '3' : '2'}` : '')
-  const membersResource = useResource<'qzos-knowledge'>(section === 'teamData' || dialog?.kind === 'acl' ? `dsh-resource://qzos-knowledge/members?id=${item.id}&epoch=${epoch}&revision=${revision}` : '')
+  const membersResource = useResource<'qzos-knowledge'>(section === 'teamData' || dialog?.kind === 'acl' ? `dsh-resource://qzos-knowledge/members?id=${item.id}&epoch=${epoch}&revision=${revision}&page=${membersPage}&page_size=15` : '')
+  const allMembersResource = useResource<'qzos-knowledge'>(dialog?.kind === 'transfer' ? `dsh-resource://qzos-knowledge/members-all?id=${item.id}&epoch=${epoch}&revision=${revision}` : '')
   const correctionResource = useResource<'qzos-knowledge'>(dialog?.kind === 'correct' ? `dsh-resource://qzos-knowledge/list?epoch=${epoch}&revision=${revision}&all=1` : '')
   const knowledge = correctionResource.value ? knowledgeRows(correctionResource.value.rows).map(knowledgeCard) : []
   const capabilitiesResource = useResource<'qzos-knowledge'>(mode === 'import' ? `dsh-resource://qzos-knowledge/import-capabilities?epoch=${epoch}&revision=${revision}` : '')
@@ -105,6 +107,8 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
   const documents = documentsResource.value ? knowledgeTable(knowledgeRows(documentsResource.value.rows), 'files') : []
   const fragments = fragmentsResource.value ? knowledgeTable(knowledgeRows(fragmentsResource.value.rows), 'fragments') : []
   const members = membersResource.value ? knowledgeTable(knowledgeRows(membersResource.value.rows), 'members') : []
+  const allMembers = allMembersResource.value ? knowledgeTable(knowledgeRows(allMembersResource.value.rows), 'members') : []
+  const membersTotal = Number(membersResource.value?.total ?? members.length)
   const documentsTotal = Number(documentsResource.value?.total ?? documents.length)
   const fragmentsTotal = Number(fragmentsResource.value?.total ?? fragments.length)
   useEffect(() => { setDocumentsPage(1) }, [search])
@@ -154,7 +158,7 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
       await knowledgeRequest(`/kb.teach/${dialog.row ? 'update' : 'insert'}`, { ...dialog.row ? { uuid: dialog.row.id } : { kb_id: Number(item.id), fd_id: Number(document?.id) }, question: dialogDraft.question, answer: dialogDraft.answer, ...attachments })
     }
     if (dialog.kind === 'transfer') {
-      const target = members.find(member => member.id === dialogDraft.member)
+      const target = allMembers.find(member => member.id === dialogDraft.member)
       if (!target) throw new Error(t('kbMemberMatch'))
       await knowledgeRequest('/kb.know/transfer', { kb_id: Number(item.id), type: 'kb', sn: Number(target.sn) })
       actions.setDetail('knowledge', null); actions.refreshKnowledge()
@@ -317,10 +321,10 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
       </>}
     </>}
     {section === 'testData' && <div className={`${css.columns} ${css.searchColumns}`}><div><label className={css.searchField}><span>{r('testText')}</span><textarea className={css.textArea} rows={20} value={question} onChange={(event) =>{  setQuestion(event.target.value) }} /></label><div className={`${css.toolbar} ${css.searchButtons}`}><Button variant="primary" disabled={busy || !question.trim()} onClick={() => { void perform(async () => { setTested(false); setHits([]); setHits(knowledgeRows(await knowledgeRequest('/kb.teach/tests', { ...knowledgeSearchInput(draft), question, kb_id: Number(item.id) }))); setTested(true) }) }}>{r('test')}</Button><Button onClick={() =>{  show('parameters') }}>{t(draft.search_mode === 'full' ? 'pc35' : draft.search_mode === 'mix' ? 'pc36' : 'pc34')}</Button></div></div><div>{tested ? <><h2>{r('results')}</h2>{hits.length === 0 && <p>{r('empty')}</p>}{hits.map((hit, index) => <div key={`${index}:${knowledgeText(hit.question)}`} className={css.result}><strong>{knowledgeText(hit.question ?? '')}</strong><p>{knowledgeText(hit.answer ?? '')}</p><p>{sourceCitation(hit, { page: t('sourcePage'), slide: t('sourceSlide'), sheet: t('sourceSheet'), cells: t('sourceCells'), paragraph: t('sourceParagraph'), missing: t('sourceMissing') })}</p><span>{r('score')}：{knowledgeText(hit.score ?? hit.full_score ?? hit.emb_score ?? '')}</span></div>)}</> : <div className={css.searchEmpty}>{r('testResult')}</div>}</div></div>}
-    {section === 'teamData' && <><h2>{r('myTeam')}</h2><div className={css.toolbar}><span>{r('teamMembers')} ({membersResource.value ? members.length : '—'})</span>{owned && <Button variant="outline" onClick={() =>{  show('member') }}>+ {r('addMember')}</Button>}</div>
-      <ResourceTable paginate loading={!membersResource.value && membersResource.status !== 'failed'} rows={members} r={r} columns={[['nickname', 'memberInfo'], ['role', 'memberRole'], ['power', 'defaultPermission'], ['createdAt', 'joinedAt']]} cell={(row, key) => key === 'nickname' ? <span className={css.memberIdentity}>{row.avatar ? <img className={css.memberAvatar} src={row.avatar} alt="" /> : <IconUsersOutlineRegular size={28} />}<span>{row.nickname}</span>{row.sn === membersResource.value?.currentSn && <Tag>{t('knowledgeMe')}</Tag>}</span> : key === 'role' ? r(row.role === 'owner' ? 'owner' : 'member') : key === 'power' ? r(row.power === 'all' ? 'allPermission' : row.power === 'edit' ? 'editPermission' : row.power === 'manage' ? 'managePermission' : 'viewPermission') : row[key] ?? '—'} actions={row => row.role === 'owner' ? [] : owned ? [
+    {section === 'teamData' && <><h2>{r('myTeam')}</h2><div className={css.toolbar}><span>{r('teamMembers')} ({membersTotal})</span>{owned && <Button variant="outline" onClick={() =>{  show('member') }}>+ {r('addMember')}</Button>}</div>
+      <ResourceTable paginate page={membersPage} total={membersTotal} pageSize={15} onPage={setMembersPage} loading={!membersResource.value && membersResource.status !== 'failed'} rows={members} r={r} columns={[['nickname', 'memberInfo'], ['role', 'memberRole'], ['power', 'defaultPermission'], ['createdAt', 'joinedAt']]} cell={(row, key) => key === 'nickname' ? <span className={css.memberIdentity}>{row.avatar ? <img className={css.memberAvatar} src={row.avatar} alt="" /> : <IconUsersOutlineRegular size={28} />}<span>{row.nickname}</span>{row.sn === membersResource.value?.currentSn && <Tag>{t('knowledgeMe')}</Tag>}</span> : key === 'role' ? r(row.role === 'owner' ? 'owner' : 'member') : key === 'power' ? r(row.power === 'all' ? 'allPermission' : row.power === 'edit' ? 'editPermission' : row.power === 'manage' ? 'managePermission' : 'viewPermission') : row[key] ?? '—'} actions={row => row.role === 'owner' ? [] : owned ? [
         { label: 'editPermission', run: () =>{  memberPower(row.id, 2) } }, { label: 'viewPermission', run: () =>{  memberPower(row.id, 3) } }, { label: 'managePermission', run: () =>{  memberPower(row.id, 1) } }, { label: 'removeMember', run: () =>{  setConfirmation({ key: membersKey, ids: [row.id] }) } },
-      ] : []} />{owned && members.some(member => member.role !== 'owner') && <Button onClick={() =>{ show('transfer') }}>{r('transfer')}</Button>}</>}
+      ] : []} />{owned && membersTotal > 1 && <Button onClick={() =>{ show('transfer') }}>{r('transfer')}</Button>}</>}
     {section === 'setUp' && <><h2>{r('knowledgeSettings')}</h2><div className={css.tabs}><Button aria-pressed>{r('baseInfo')}</Button></div><ResourceFields t={t} form="knowledgeSettings" draft={draft} options={modelOptions} onChange={update} knowledge={knowledge} editing disabled={busy || !manageable} /><div className={css.formFooter}><Button variant="primary" disabled={busy || !manageable} onClick={() => { if (Number(draft.external_enabled) === 1 && Number(savedDraft.external_enabled ?? 0) !== 1) setExternalConfirm(true); else saveSettings() }}>{r('saveSettings')}</Button><Button variant="outline" className={css.dangerAction} disabled={busy || !owned} onClick={onDelete}>{r('delete')}</Button></div></>}
     {dialog?.kind === 'member' && <KnowledgeMembers {...props} kb={item.id} onClose={() => { setDialog(null) }} onSaved={refresh} />}
     {dialog?.kind === 'acl' && dialog.row && <KnowledgeAcl {...props} fd={dialog.row.id} onClose={() => { setDialog(null) }} />}
@@ -330,7 +334,7 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
       {notice && <p role="alert">{notice}</p>}
       {dialog?.kind === 'fragment' && <><Button disabled={busy || !dialogDraft.question?.trim()} onClick={() => { void perform(async () => { const value = loginRecord(await knowledgeRequest('/kb.teach/charging', { kb_id: Number(item.id), text: `${dialogDraft.question ?? ''}\n${dialogDraft.answer ?? ''}` })); setEstimate(knowledgeText(value.tokens)) }) }}>{t('learningEstimate')}</Button>{estimate && <p role="status">{t('learningEstimateHint')}: {estimate}</p>}</>}
       {dialog?.kind === 'rename' ? <label>{r('name')}<Input value={dialogDraft.name ?? ''} onChange={(event) =>{  setDialogDraft(current => ({ ...current, name: event.target.value })) }} /></label>
-        : dialog?.kind === 'transfer' ? <><p>{r('transferConfirm')}</p><select aria-label={r('memberInfo')} value={dialogDraft.member ?? ''} onChange={(event) =>{  setDialogDraft(current => ({ ...current, member: event.target.value })) }}><option value="">—</option>{members.filter(member => member.role !== 'owner').map(member => <option key={member.id} value={member.id}>{member.nickname}</option>)}</select></>
+        : dialog?.kind === 'transfer' ? <><p>{r('transferConfirm')}</p><select aria-label={r('memberInfo')} value={dialogDraft.member ?? ''} onChange={(event) =>{  setDialogDraft(current => ({ ...current, member: event.target.value })) }}><option value="">—</option>{allMembers.filter(member => member.role !== 'owner').map(member => <option key={member.id} value={member.id}>{member.nickname}</option>)}</select></>
           : <ResourceFields t={t} form={dialogForm} disabled={busy} draft={dialogDraft} knowledge={knowledge} options={dialog?.kind === 'parameters' ? { ...modelOptions, optimize_m_id: modelOptions.documents_model_id ?? [] } : {}}
             onChange={(key, value) =>{  setDialogDraft(current => ({ ...current, [key]: value })) }} />}
       {dialog?.kind === 'fragment' && <div className={css.attachmentFields}>
