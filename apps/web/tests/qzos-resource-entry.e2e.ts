@@ -108,7 +108,10 @@ it.skipIf(!process.env.QZOS_RESOURCE_TEST_ACCOUNT)('retains catalog cards and cr
     expect(await employee.getByRole('textbox', { name: '一句话介绍', exact: true }).inputValue()).toBe('创建知识库后保留草稿')
     await employee.locator('summary').click()
     expect(await employee.getByRole('checkbox', { name: kbName, exact: true }).isChecked()).toBe(true)
-    await expect(employee.getByRole('button', { name: '创建并配置', exact: true })).toBeInViewport()
+    const createBounds = await employee.getByRole('button', { name: '创建并配置', exact: true }).boundingBox()
+    expect(createBounds).not.toBeNull()
+    expect(createBounds!.y).toBeGreaterThanOrEqual(0)
+    expect(createBounds!.y + createBounds!.height).toBeLessThanOrEqual(720)
     const refreshedList = page.waitForResponse(async (response) => {
       if (!response.url().includes('/kb.know/lists?')) return false
       const value = await response.json() as { data: { lists: { id: number }[] } }
