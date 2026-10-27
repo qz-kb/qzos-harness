@@ -67,6 +67,9 @@
 .imagePicker img { width: 100%; height: 100%; object-fit: cover; }
 .formFooter { display: flex; gap: 10px; justify-content: flex-start; padding: 16px 24px; border-top: 1px solid var(--dsw-alias-border-l3); }
 .dialog { width: min(560px, 100%); }
+.dialog, .knowledgeDialog { max-height: 100%; }
+.dialog > div:first-child, .knowledgeDialog > div:first-child { min-height: 0; overflow-y: auto; }
+.dialog > div:last-child, .knowledgeDialog > div:last-child { flex-shrink: 0; }
 .dialog .formFields { padding: 4px 0; }
 .dialog .formRow { gap: 16px; }
 .dialog .formRow > label { width: 100px; }

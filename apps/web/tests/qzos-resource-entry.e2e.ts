@@ -68,6 +68,7 @@ it.skipIf(!process.env.QZOS_RESOURCE_TEST_ACCOUNT)('retains catalog cards and cr
     expect(modelReads).toBe(0)
     await nav.getByRole('button', { name: '数字员工', exact: true }).click()
     // Delay an actual old server response across creation to exercise an in-flight refresh.
+    await page.setViewportSize({ width: 1280, height: 720 })
     const heldList = new Promise<void>((resolve) => { releaseList = resolve })
     let capturedList = false
     await page.route('**/api/kb.know/lists?*', async (route) => {
@@ -107,6 +108,7 @@ it.skipIf(!process.env.QZOS_RESOURCE_TEST_ACCOUNT)('retains catalog cards and cr
     expect(await employee.getByRole('textbox', { name: '一句话介绍', exact: true }).inputValue()).toBe('创建知识库后保留草稿')
     await employee.locator('summary').click()
     expect(await employee.getByRole('checkbox', { name: kbName, exact: true }).isChecked()).toBe(true)
+    await expect(employee.getByRole('button', { name: '创建并配置', exact: true })).toBeInViewport()
     const refreshedList = page.waitForResponse(async (response) => {
       if (!response.url().includes('/kb.know/lists?')) return false
       const value = await response.json() as { data: { lists: { id: number }[] } }
@@ -115,11 +117,14 @@ it.skipIf(!process.env.QZOS_RESOURCE_TEST_ACCOUNT)('retains catalog cards and cr
     releaseList!()
     await refreshedList
     expect(String((await api(`/kb.know/detail?id=${knowledgeId}`)).embedding_model_id)).toBe(vectorId)
-    const employeeAdded = page.waitForResponse(response => response.url().includes('/kb.robot/add') && response.request().method() === 'POST')
-    await employee.getByRole('button', { name: '创建并配置', exact: true }).click()
-    const employeeResult = await (await employeeAdded).json() as { code: number; data: { id: number }; msg?: string }
+    const [employeeAdded] = await Promise.all([
+      page.waitForResponse(response => response.url().includes('/kb.robot/add') && response.request().method() === 'POST'),
+      employee.getByRole('button', { name: '创建并配置', exact: true }).click(),
+    ])
+    const employeeResult = await employeeAdded.json() as { code: number; data: { id: number }; msg?: string }
     expect(employeeResult.code, employeeResult.msg).toBe(1); employeeId = employeeResult.data.id
     await employee.waitFor({ state: 'hidden' })
+    await page.setViewportSize({ width: 1440, height: 1000 })
     const saved = await api(`/kb.robot/detail?id=${employeeId}`)
     expect(saved.kb_ids).toEqual([knowledgeId])
     expect(Number(saved.model_id)).toBe(backendModelId)
