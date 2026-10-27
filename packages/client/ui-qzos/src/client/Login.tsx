@@ -33,6 +33,10 @@ export function Login({ t, actions }: PropsLocale<'qzos'> & PropsStore<ReturnTyp
     actions.businessIdentity(null); sessionStorage.removeItem(loginSessionKey); token.current = undefined; pendingMobile.current = undefined
     setUser(undefined); setBinding(false); setRegistering(false); setPassword(''); setConfirmPassword(''); setCode(''); setAccount('')
   }
+  const authorizeHost = async (credential: string, signal: AbortSignal): Promise<boolean> => {
+    try { await employeeHost({ action: 'authorize', token: credential }, signal); return true }
+    catch { /* The Host adapter is optional; employee actions report their own unavailability. */ return false }
+  }
   const accept = async (result: LoginRecord, signal: AbortSignal) => {
     if (typeof result.token !== 'string' || !result.token) throw new Error(t('loginFailed'))
     if (config?.coerce_mobile === 1 && !result.mobile) {
@@ -40,7 +44,7 @@ export function Login({ t, actions }: PropsLocale<'qzos'> & PropsStore<ReturnTyp
     }
     const profile = await loginRequest('/user/info', undefined, result.token, signal)
     if (signal.aborted) return
-    await employeeHost({ action: 'authorize', token: result.token }, signal)
+    await authorizeHost(result.token, signal)
     signal.throwIfAborted()
     token.current = result.token
     sessionStorage.setItem(loginSessionKey, JSON.stringify({ api: loginApi, token: result.token }))
@@ -63,7 +67,7 @@ export function Login({ t, actions }: PropsLocale<'qzos'> & PropsStore<ReturnTyp
         if (saved) {
           try {
             const profile = await loginRequest('/user/info', undefined, saved, controller.signal)
-            await employeeHost({ action: 'authorize', token: saved }, controller.signal)
+            await authorizeHost(saved, controller.signal)
             if (active()) { token.current = saved; actions.businessIdentity(String(profile.id)); setUser(profile) }
           } catch (failure) {
             if (active()) { if (failure instanceof LoginError && [-1, -2].includes(failure.code)) clear(); error(failure) }
@@ -106,7 +110,7 @@ export function Login({ t, actions }: PropsLocale<'qzos'> & PropsStore<ReturnTyp
       const saved = token.current
       if (!saved) return
       void loginRequest('/user/info', undefined, saved, controller.signal).then(async (profile) => {
-        await employeeHost({ action: 'authorize', token: saved }, controller.signal)
+        await authorizeHost(saved, controller.signal)
         if (!controller.signal.aborted && token.current === saved) setUser(profile)
       }).catch((failure: unknown) => {
         if (!controller.signal.aborted && token.current === saved) {

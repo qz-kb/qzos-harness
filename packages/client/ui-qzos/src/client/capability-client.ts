@@ -1,5 +1,6 @@
 /** Existing market and template contracts, scoped to the current business login. */
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
+import { qzosApiVersion } from './product-updates.ts'
 import { knowledgeRequest, knowledgeRows, knowledgeText } from './knowledge-client.ts'
 import { loginApi, loginCredentials, loginRecord, storedLogin, LoginError, type LoginRecord } from './login-client.ts'
 
@@ -43,7 +44,7 @@ export async function exportSkill(entry: LoginRecord, signal: AbortSignal, token
   if (!token || storedLogin(sessionStorage) !== token) throw new LoginError('登录账号已变更，请重新打开页面', -1)
   const response = await fetch(`${loginApi}/skill.market/exportOffline`, {
     method: 'POST', credentials: loginCredentials, redirect: 'error', cache: 'no-store',
-    headers: { token, terminal: '4', version: '4.8.0', 'Content-Type': 'application/json' },
+    headers: { token, terminal: '4', version: qzosApiVersion, 'Content-Type': 'application/json' },
     body: JSON.stringify({ resource_id: entry.resource_id, version: entry.version, request_id: randomUUID() }),
     signal: AbortSignal.any([signal, AbortSignal.timeout(60000)]),
   })

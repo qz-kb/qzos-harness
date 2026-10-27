@@ -65,9 +65,11 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
   const [menuValues, setMenuValues] = useState(() => knowledgeRows(original.menus))
   const [channel, setChannel] = useState('')
   const publicationType = channel === 'api' ? 4 : channel === 'js' ? 2 : 1
+  const [sharesPage, setSharesPage] = useState(1)
   const [publicArtifact, setPublicArtifact] = useState<{ row: PreviewRow; poster: boolean } | null>(null)
   const [dialogueTab, setDialogueTab] = useState('data')
   const [feedbackFilter, setFeedbackFilter] = useState('all')
+  const [dialoguesPage, setDialoguesPage] = useState(1)
   const [selected, setSelected] = useState<string[]>([])
   const [dialog, setDialog] = useState<EmployeeDialog | null>(null)
   const [dialogDraft, setDialogDraft] = useState<PreviewValues>({})
@@ -86,15 +88,20 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
     ...knowledgeDraft(row), id: String(index), name: knowledgeText(row.keyword),
   }))
   const query = `id=${item.id}&epoch=${epoch}&revision=${revision}`
-  const publicationResource = useResource<'qzos-knowledge'>(section === 'release' && channel ? `dsh-resource://qzos-knowledge/employee-publications?${query}&type=${publicationType}` : '')
-  const recordResource = useResource<'qzos-knowledge'>(section === 'dialogue' && dialogueTab === 'records' ? `dsh-resource://qzos-knowledge/employee-records?${query}` : '')
+  const feedbackParam = feedbackFilter === 'reviewed' ? '1' : feedbackFilter === 'unreviewed' ? '0' : '-1'
+  const publicationResource = useResource<'qzos-knowledge'>(section === 'release' && channel ? `dsh-resource://qzos-knowledge/employee-publications?${query}&type=${publicationType}&page=${sharesPage}&page_size=15` : '')
+  const recordResource = useResource<'qzos-knowledge'>(section === 'dialogue' && dialogueTab === 'records' ? `dsh-resource://qzos-knowledge/employee-records?${query}&is_feedback=${feedbackParam}&page=${dialoguesPage}&page_size=15` : '')
+  useEffect(() => { setSharesPage(1) }, [channel])
+  useEffect(() => { setDialoguesPage(1) }, [feedbackFilter, dialogueTab])
   const feedbackResource = useResource<'qzos-knowledge'>(section === 'dialogue' && dialogueTab === 'data' ? `dsh-resource://qzos-knowledge/employee-feedback?${query}` : '')
   const statsResource = useResource<'qzos-knowledge'>(section === 'dialogue' && dialogueTab === 'data' ? `dsh-resource://qzos-knowledge/employee-stats?${query}` : '')
   const usageResource = useResource<'qzos-knowledge'>(section === 'dialogue' && dialogueTab === 'data' ? `dsh-resource://qzos-knowledge/employee-usage?${query}` : '')
   const keysResource = useResource<'qzos-knowledge'>(dialog?.kind === 'keys' && dialog.row ? `dsh-resource://qzos-knowledge/employee-keys?id=${dialog.row.id}&epoch=${epoch}&revision=${revision}` : '')
   const keys = keysResource.value ? knowledgeRows(keysResource.value.rows) : []
   const shares: PreviewRow[] = publicationResource.value ? knowledgeRows(publicationResource.value.rows).map(row => ({ ...knowledgeDraft(row), id: knowledgeText(row.id), name: knowledgeText(row.name), entryId: knowledgeText(row.apikey), key: '', password: row.has_password ? 'protected' : '', status: row.status === 'active' ? 'enabled' : 'disabled', lastUsed: knowledgeText(row.use_time), mode: Number(row.type) === 2 ? 'js' : 'web' })) : []
-  const dialogues: PreviewRow[] = recordResource.value ? knowledgeRows(recordResource.value.rows).map(row => ({ ...knowledgeDraft(row), id: knowledgeText(row.id), name: knowledgeText(row.ask), question: knowledgeText(row.ask), answer: knowledgeText(row.reply), questionTime: knowledgeText(row.create_time), userInfo: knowledgeText(loginRecord(row.user).nickname), reviewed: Number(row.is_feedback) === 1 ? '1' : '0' })) : []
+  const dialogues: PreviewRow[] = recordResource.value ? knowledgeRows(recordResource.value.rows).map(row => ({ ...knowledgeDraft(row), id: knowledgeText(row.id), name: knowledgeText(row.ask), question: knowledgeText(row.ask), answer: knowledgeText(row.reply), questionTime: knowledgeText(row.create_time), userInfo: knowledgeText(loginRecord(row.user ?? {}).nickname), reviewed: Number(row.is_feedback) === 1 ? '1' : '0' })) : []
+  const sharesTotal = Number(publicationResource.value?.total ?? shares.length)
+  const dialoguesTotal = Number(recordResource.value?.total ?? dialogues.length)
   const perform = async (work: () => Promise<void>) => {
     if (pending.current) return
     pending.current = true; setBusy(true); setNotice('')
@@ -160,7 +167,7 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
     else { unsupported(); return }
     setConfirmation(null); setSelected([]); refresh()
   }) }
-  const dialogueRows = dialogues.filter(row => feedbackFilter === 'all' || row.reviewed === (feedbackFilter === 'reviewed' ? '1' : '0'))
+  const dialogueRows = dialogues
   const dialogTitle: ResourceText = dialog?.kind === 'menu' ? 'addMenu' : dialog?.kind === 'share' ? 'createLink'
     : dialog?.kind === 'api' ? 'createApi' : dialog?.kind === 'quota' ? 'usageSettings' : dialog?.kind === 'keys' ? 'manageKeys'
       : dialog?.kind === 'feedback' ? 'questionFeedback' : dialog?.kind === 'correct' ? 'correct' : 'viewReply'
@@ -209,7 +216,7 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
       {!channel ? platformGroups.map(([group, platforms]) => <div key={group}><h3>{r(group)}</h3><div className={css.platformGrid}>{platforms.map(platform => <button type="button" key={platform} disabled={['api', 'oa', 'qwx', 'rpa'].includes(platform)} onClick={() =>{  setChannel(platform === 'poster' ? 'web' : platform) }}><img src={publicationArtwork[platform as keyof typeof publicationArtwork]} alt="" /><span>{r(platform)}<small>{t(`pcPlatform${platform}` as QzosKey)}</small>{['api', 'oa', 'qwx', 'rpa'].includes(platform) && <small>{platform === 'api' ? t('employeeApiDeferred') : r('comingSoon')}</small>}</span></button>)}</div></div>)
         : <><Button onClick={() =>{  setChannel('') }}><IconChevronLeftOutlineRegular size={16} />{r(channel === 'api' ? 'api' : channel === 'js' ? 'js' : 'web')}</Button><p className={css.notice}>{r('webHint')}</p>
           <div className={css.toolbar}><Button variant="primary" disabled={busy} onClick={() => { show(channel === 'api' ? 'api' : 'share') }}>{r(channel === 'api' ? 'createApi' : 'createLink')}</Button></div>
-          <ResourceTable rows={shares} r={r} columns={channel === 'api' ? [['status', 'status'], ['name', 'name'], ['lastUsed', 'lastUsed']] : [['status', 'status'], ['entryId', 'entryId'], ['name', 'shareName'], ['password', 'password'], ['mode', 'mode'], ['lastUsed', 'lastUsed']]}
+          <ResourceTable paginate page={sharesPage} total={sharesTotal} pageSize={15} onPage={setSharesPage} rows={shares} r={r} columns={channel === 'api' ? [['status', 'status'], ['name', 'name'], ['lastUsed', 'lastUsed']] : [['status', 'status'], ['entryId', 'entryId'], ['name', 'shareName'], ['password', 'password'], ['mode', 'mode'], ['lastUsed', 'lastUsed']]}
             cell={(row, key) => key === 'status' ? r(row.status === 'enabled' ? 'enabled' : 'disabled') : key === 'password' ? row.password ? '••••••' : '—' : key === 'mode' ? r(row.mode === 'js' ? 'js' : 'web') : row[key] ?? '—'} actions={row => [
               { label: row.status === 'enabled' ? 'deactivate' : 'enabled', run: () => { void perform(async () => { await request('/kb.publish/manage', { id: Number(row.id), action: row.status === 'enabled' ? 'disable' : 'enable' }); refresh() }) } },
               ...channel === 'api' ? [{ label: 'manageKeys' as const, run: () =>{  show('keys', row) } }] : [{ label: 'copyLink' as const, run: () => { void perform(async () => { await navigator.clipboard.writeText(publicationUrl(publicVisitorApi, row.entryId ?? '', Number(row.type))); setNotice(t('publicationCopied')) }) } }, { label: 'edit' as const, run: () =>{  show('share', row) } }, { label: 'preview' as const, run: () => { setPublicArtifact({ row, poster: false }) } }, ...channel === 'js' ? [{ label: 'js' as const, run: () => { setPublicArtifact({ row, poster: false }) } }] : [{ label: 'generatePoster' as const, run: () => { setPublicArtifact({ row, poster: true }) } }]],
@@ -235,7 +242,7 @@ function EmployeeContent(props: EmployeeDetailProps & { original: LoginRecord })
         {usageResource.status === 'failed' && <p role="status">{t('employeeUsageUnavailable')} {usageResource.failure?.message}</p>}</details>
       </>
         : <><div className={css.toolbar}><Button disabled={selected.length === 0} onClick={() =>{  setConfirmation({ key: dialoguesKey, ids: selected }) }}>{r('batchDelete')}</Button><select aria-label={r('feedback')} value={feedbackFilter} onChange={(event) =>{  setFeedbackFilter(event.target.value) }}>{(['all', 'unreviewed', 'reviewed'] as const).map(value => <option key={value} value={value}>{r(value)}</option>)}</select></div>
-          <ResourceTable paginate loading={recordResource.status === 'loading' && !recordResource.value} rows={dialogueRows} r={r} selection={selected} onSelection={setSelected} columns={[['id', 'id'], ['userInfo', 'userInfo'], ['question', 'question'], ['answer', 'answer'], ['feedback', 'feedback'], ['questionTime', 'questionTime']]} actions={row => [{ label: 'questionFeedback', run: () =>{  show('feedback', row) } }, { label: 'correct', run: () =>{  show('correct', row) } }, { label: 'viewReply', run: () =>{  show('reply', row, true) } }, { label: 'delete', run: () =>{  setConfirmation({ key: dialoguesKey, ids: [row.id] }) } }]} />
+          <ResourceTable paginate page={dialoguesPage} total={dialoguesTotal} pageSize={15} onPage={setDialoguesPage} loading={recordResource.status === 'loading' && !recordResource.value} rows={dialogueRows} r={r} selection={selected} onSelection={setSelected} columns={[['id', 'id'], ['userInfo', 'userInfo'], ['question', 'question'], ['answer', 'answer'], ['feedback', 'feedback'], ['questionTime', 'questionTime']]} actions={row => [{ label: 'questionFeedback', run: () =>{  show('feedback', row) } }, { label: 'correct', run: () =>{  show('correct', row) } }, { label: 'viewReply', run: () =>{  show('reply', row, true) } }, { label: 'delete', run: () =>{  setConfirmation({ key: dialoguesKey, ids: [row.id] }) } }]} />
         </>}
     </div>}
     <Modal open={newKnowledge !== null} onClose={() => { if (!busy) setNewKnowledge(null) }} title={r('newKnowledge')} closeLabel={r('close')} className={css.knowledgeDialog as string}

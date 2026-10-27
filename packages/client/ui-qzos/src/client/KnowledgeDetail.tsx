@@ -45,6 +45,8 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
     requestKnowledge(path, body, lifetime.signal, credential.current)
   const [mode, setMode] = useState<'documents' | 'import' | 'fragments'>('documents')
   const [document, setDocument] = useState<PreviewRow | null>(null)
+  const [documentsPage, setDocumentsPage] = useState(1)
+  const [fragmentsPage, setFragmentsPage] = useState(1)
   const [query, setQuery] = useState('')
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
@@ -87,8 +89,8 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
   const documentsKey = `${item.id}:documents`
   const fragmentsKey = `${item.id}:fragments:${document?.id ?? ''}`
   const membersKey = `${item.id}:members`
-  const documentsResource = useResource<'qzos-knowledge'>(section === 'dataStudy' || section === 'testData' ? `dsh-resource://qzos-knowledge/files?id=${item.id}&epoch=${epoch}&revision=${revision}` : '')
-  const fragmentsResource = useResource<'qzos-knowledge'>(document && mode === 'fragments' ? `dsh-resource://qzos-knowledge/fragments?id=${item.id}&fd=${document.id}&epoch=${epoch}&revision=${revision}` : '')
+  const documentsResource = useResource<'qzos-knowledge'>(section === 'dataStudy' || section === 'testData' ? `dsh-resource://qzos-knowledge/files?id=${item.id}&epoch=${epoch}&revision=${revision}&page=${documentsPage}&page_size=15&keyword=${encodeURIComponent(search)}` : '')
+  const fragmentsResource = useResource<'qzos-knowledge'>(document && mode === 'fragments' ? `dsh-resource://qzos-knowledge/fragments?id=${item.id}&fd=${document.id}&epoch=${epoch}&revision=${revision}&page=${fragmentsPage}&page_size=15&keyword=${encodeURIComponent(search)}&status=${status === 'all' ? '' : status === 'waitingLearn' ? '0' : status === 'learning' ? '1' : status === 'failedLearn' ? '3' : '2'}` : '')
   const membersResource = useResource<'qzos-knowledge'>(section === 'teamData' || dialog?.kind === 'acl' ? `dsh-resource://qzos-knowledge/members?id=${item.id}&epoch=${epoch}&revision=${revision}` : '')
   const capabilitiesResource = useResource<'qzos-knowledge'>(mode === 'import' ? `dsh-resource://qzos-knowledge/import-capabilities?epoch=${epoch}&revision=${revision}` : '')
   const capabilities = loginRecord(capabilitiesResource.value?.capabilities ?? {})
@@ -101,6 +103,10 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
   const documents = documentsResource.value ? knowledgeTable(knowledgeRows(documentsResource.value.rows), 'files') : []
   const fragments = fragmentsResource.value ? knowledgeTable(knowledgeRows(fragmentsResource.value.rows), 'fragments') : []
   const members = membersResource.value ? knowledgeTable(knowledgeRows(membersResource.value.rows), 'members') : []
+  const documentsTotal = Number(documentsResource.value?.total ?? documents.length)
+  const fragmentsTotal = Number(fragmentsResource.value?.total ?? fragments.length)
+  useEffect(() => { setDocumentsPage(1) }, [search])
+  useEffect(() => { setFragmentsPage(1) }, [document?.id, search, status])
   useEffect(() => {
     if (section !== 'dataStudy' || busy) return
     const resource = mode === 'documents' ? documentsResource : mode === 'fragments' ? fragmentsResource : null
@@ -242,8 +248,8 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
     const anchor = globalThis.document.createElement('a'); anchor.href = url; anchor.download = 'qzos-knowledge.csv'; anchor.click()
     setTimeout(() =>{  URL.revokeObjectURL(url) }, 0)
   }
-  const filteredDocuments = documents.filter(row => row.name.includes(search))
-  const filteredFragments = fragments.filter(row => `${row.question} ${row.answer}`.includes(search) && (status === 'all' || row.status === status))
+  const filteredDocuments = documents
+  const filteredFragments = fragments
   const dialogTitle: ResourceText = dialog?.kind === 'rename' ? 'rename' : dialog?.kind === 'member' ? 'addMember'
     : dialog?.kind === 'acl' ? 'filePermissions'
       : dialog?.kind === 'parameters' ? 'searchParameters' : dialog?.kind === 'transfer' ? 'transferTitle' : 'entryData'
@@ -259,7 +265,7 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
     {section === 'dataStudy' && <>
       {mode === 'documents' ? <>
         <div className={css.toolbar}><div className={css.inline}><Button variant="primary" disabled={busy || !editable} onClick={() =>{  setVersionTarget(null); setFiles([]); setPreviews([]); setWebPages([]); imports.current.clear(); setMode('import') }}>{r('importData')}</Button><Button aria-label={r('refresh')} onClick={() => { setQuery(''); setSearch(''); refresh() }}><IconRefreshOutlineRegular size={18} /></Button></div><div className={css.inline}><Input aria-label={r('keyword')} placeholder={r('keyword')} value={query} onChange={(event) =>{  setQuery(event.target.value) }} onKeyDown={(event) => { if (event.key === 'Enter') setSearch(query) }} /><Button variant="primary" onClick={() =>{  setSearch(query) }}>{r('query')}</Button><Button onClick={() => { setQuery(''); setSearch('') }}>{r('reset')}</Button></div></div>
-        <ResourceTable paginate loading={!documentsResource.value && documentsResource.status !== 'failed'} rows={filteredDocuments} r={r} columns={[['name', 'name'], ['waiting', 'waiting'], ['trained', 'trained'], ['totalData', 'totalData'], ['createdAt', 'createdAt']]} onOpen={openDocument}
+        <ResourceTable paginate page={documentsPage} total={documentsTotal} pageSize={15} onPage={setDocumentsPage} loading={!documentsResource.value && documentsResource.status !== 'failed'} rows={filteredDocuments} r={r} columns={[['name', 'name'], ['waiting', 'waiting'], ['trained', 'trained'], ['totalData', 'totalData'], ['createdAt', 'createdAt']]} onOpen={openDocument}
           actions={row => [
             { label: 'fileAccess' as const, run: () => { setAccessFile(row) } },
             ...row.hasParse === '1' ? [{ label: 'parseStatus' as const, run: () => { setParseFile(row) } }] : [],
@@ -304,7 +310,7 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
         </p>)}
         <div className={css.toolbar}><div className={css.inline}><Button variant="primary" disabled={busy || !editable} onClick={() =>{  show('fragment') }}>{r('entryData')}</Button><Button disabled={busy || !editable} onClick={exportRows}>{r('exportAll')}</Button><Button disabled={busy || selection.length === 0 || selection.some(id => fragments.find(row => row.id === id)?.can_retry !== '1')} onClick={() =>{  retry(selection) }}>{r('batchRetry')}</Button><Button disabled={busy || selection.length === 0 || selection.some(id => fragments.find(row => row.id === id)?.can_delete !== '1')} onClick={() =>{  setConfirmation({ key: fragmentsKey, ids: selection }) }}>{r('batchDelete')}</Button></div>
           <div className={css.inline}><Input value={query} aria-label={r('keyword')} placeholder={r('keyword')} onChange={(event) => { setQuery(event.target.value); setSearch(event.target.value) }} /><select value={status} onChange={(event) =>{  setStatus(event.target.value) }} aria-label={r('learningStatus')}>{(['all', 'waitingLearn', 'learning', 'failedLearn', 'learned'] as const).map(value => <option key={value} value={value}>{r(value)}</option>)}</select></div></div>
-        <ResourceTable paginate loading={!fragmentsResource.value && fragmentsResource.status !== 'failed'} rows={filteredFragments} r={r} selection={selection} onSelection={setSelection} columns={[['question', 'documentContent'], ['answer', 'extraContent'], ['status', 'learningStatus'], ['consumed', 'consumed'], ['updatedAt', 'updatedAt']]} cell={(row, key) => key === 'status' ? r(row.status === 'learned' ? 'learned' : row.status === 'failedLearn' ? 'failedLearn' : row.status === 'learning' ? 'learning' : 'waitingLearn') : row[key] ?? '—'} actions={row => [
+        <ResourceTable paginate page={fragmentsPage} total={fragmentsTotal} pageSize={15} onPage={setFragmentsPage} loading={!fragmentsResource.value && fragmentsResource.status !== 'failed'} rows={filteredFragments} r={r} selection={selection} onSelection={setSelection} columns={[['question', 'documentContent'], ['answer', 'extraContent'], ['status', 'learningStatus'], ['consumed', 'consumed'], ['updatedAt', 'updatedAt']]} cell={(row, key) => key === 'status' ? r(row.status === 'learned' ? 'learned' : row.status === 'failedLearn' ? 'failedLearn' : row.status === 'learning' ? 'learning' : 'waitingLearn') : row[key] ?? '—'} actions={row => [
           { label: 'correct', disabled: row.can_edit !== '1', run: () =>{  show('fragment', row) } }, ...row.status === 'failedLearn' ? [{ label: 'retry' as const, disabled: row.can_retry !== '1', run: () =>{  retry([row.id]) } }] : [], { label: 'delete', disabled: row.can_delete !== '1', run: () =>{  setConfirmation({ key: fragmentsKey, ids: [row.id] }) } },
         ]} />
       </>}

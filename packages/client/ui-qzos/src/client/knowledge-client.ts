@@ -1,4 +1,4 @@
-import { qzosVersionedUrl, qzosSurface, qzosClientVersion } from './product-updates.ts'
+import { qzosVersionedUrl, qzosSurface, qzosClientVersion, qzosApiVersion } from './product-updates.ts'
 /** QZOS knowledge transport and native DSH resource provider. */
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-resources/client'
@@ -42,7 +42,7 @@ export async function knowledgeRequest(
   if (!token) throw new LoginError('请先登录 QZOS', -1)
   const response = await fetch(qzosVersionedUrl(`${loginApi}${path}`), {
     method: body ? 'POST' : 'GET', credentials: loginCredentials, redirect: 'error', cache: 'no-store',
-    headers: { terminal: '4', version: '4.8.0', token, ...body instanceof FormData ? {} : { 'Content-Type': 'application/json' } },
+    headers: { terminal: '4', version: qzosApiVersion, token, ...body instanceof FormData ? {} : { 'Content-Type': 'application/json' } },
     ...body ? { body: body instanceof FormData ? body : JSON.stringify(body) } : {},
     signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(60000)]) : AbortSignal.timeout(60000),
   })
@@ -157,6 +157,8 @@ export function installKnowledgeResources(ctx: Context): (panel: string) => void
           } while (!signal.aborted)
           return
         }
+        const page = Math.max(1, Number(url.searchParams.get('page')) || 1)
+        const pageSize = Math.min(100, Math.max(1, Number(url.searchParams.get('page_size')) || 15))
         switch (kind) {
           case 'product-updates': value = loginRecord(await knowledgeRequest(`/productUpdate/overview?surface=${qzosSurface()}&version=${qzosClientVersion}&check=${Number(url.searchParams.get('revision') ?? 0) > 0 ? 1 : 0}`, undefined, signal)); break
           case 'models': value = { models: loginRecord(await knowledgeRequest('/index/models', undefined, signal)) }; break
@@ -198,8 +200,11 @@ export function installKnowledgeResources(ctx: Context): (panel: string) => void
             const to = Math.floor(Date.now() / 1000)
             value = loginRecord(await knowledgeRequest(`/v1/kb/feedback/summary?robot_id=${encodeURIComponent(id)}&from=${to - 30 * 86400}&to=${to}`, undefined, signal)); break
           }
-          case 'employee-records': value = { rows: await knowledgePages(`/kb.chat/dataRecord?robot_id=${encodeURIComponent(id)}&is_feedback=-1`, signal) }; break
-          case 'employee-publications': value = { rows: await knowledgePages(`/kb.share/lists?robot_id=${encodeURIComponent(id)}&type=${['1', '2', '4'].includes(url.searchParams.get('type') ?? '') ? url.searchParams.get('type') : 1}`, signal) }; break
+          case 'employee-records': {
+            const feedback = ['0', '1'].includes(url.searchParams.get('is_feedback') ?? '') ? url.searchParams.get('is_feedback') : '-1'
+            value = await knowledgePage(`/kb.chat/dataRecord?robot_id=${encodeURIComponent(id)}&is_feedback=${encodeURIComponent(feedback ?? '-1')}`, page, pageSize, signal); break
+          }
+          case 'employee-publications': value = await knowledgePage(`/kb.share/lists?robot_id=${encodeURIComponent(id)}&type=${['1', '2', '4'].includes(url.searchParams.get('type') ?? '') ? url.searchParams.get('type') : 1}`, page, pageSize, signal); break
           case 'acl': {
             const [rows, subjects] = await Promise.all([
               knowledgeRequest(`/kb.documentAcl/rules?fd_id=${encodeURIComponent(fd)}`, undefined, signal),
@@ -211,7 +216,7 @@ export function installKnowledgeResources(ctx: Context): (panel: string) => void
             const detail = loginRecord(await knowledgeRequest(`/kb.know/detail?id=${encodeURIComponent(id)}`, undefined, signal))
             value = { detail }; break
           }
-          case 'files': value = { rows: await knowledgePages(`/kb.know/files?kb_id=${encodeURIComponent(id)}`, signal) }; break
+          case 'files': value = await knowledgePage(`/kb.know/files?kb_id=${encodeURIComponent(id)}&keyword=${encodeURIComponent(url.searchParams.get('keyword') ?? '')}`, page, pageSize, signal); break
           case 'file': {
             value = loginRecord(await knowledgeRequest(`/kb.file_gateway/original?fd_id=${encodeURIComponent(fd)}`, undefined, signal))
             if (value.can_edit === true) value.lifecycle = loginRecord(await knowledgeRequest(`/kb.lifecycle/detail?fd_id=${encodeURIComponent(fd)}`, undefined, signal))
@@ -225,12 +230,13 @@ export function installKnowledgeResources(ctx: Context): (panel: string) => void
             value = { status, review }; break
           }
           case 'fragments': {
-            const rows = await knowledgePages(`/kb.teach/datas?kb_id=${encodeURIComponent(id)}&fd_id=${encodeURIComponent(fd)}`, signal)
+            const status = ['0', '1', '2', '3'].includes(url.searchParams.get('status') ?? '') ? `&status=${url.searchParams.get('status')}` : ''
+            const result = await knowledgePage(`/kb.teach/datas?kb_id=${encodeURIComponent(id)}&fd_id=${encodeURIComponent(fd)}&keyword=${encodeURIComponent(url.searchParams.get('keyword') ?? '')}${status}`, page, pageSize, signal)
             const [learning, qa] = await Promise.all([
-              knowledgeRequest('/kb.teach/detection', { kb_id: Number(id), fd_id: Number(fd), uuids: rows.slice(0, 50).map(row => row.uuid) }, signal),
+              knowledgeRequest('/kb.teach/detection', { kb_id: Number(id), fd_id: Number(fd), uuids: result.rows.slice(0, 50).map(row => row.uuid) }, signal),
               knowledgeRequest('/kb.teach/qaCheck', { fd_ids: [Number(fd)] }, signal),
             ])
-            value = { rows, learning: loginRecord(learning), qa: loginRecord(qa) }; break
+            value = { ...result, learning: loginRecord(learning), qa: loginRecord(qa) }; break
           }
           case 'import-capabilities': value = { capabilities: loginRecord(await knowledgeRequest('/kb.teach/importCapabilities', undefined, signal)) }; break
           case 'member-options': value = { rows: await knowledgePages(`/kb.know/teamUsers?kb_id=${encodeURIComponent(id)}&keyword=${encodeURIComponent(url.searchParams.get('query') ?? '')}`, signal) }; break

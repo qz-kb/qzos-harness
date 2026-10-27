@@ -8,6 +8,10 @@ import css from './Resources.module.css'
 export type ResourceTableProps = {
   loading?: boolean
   paginate?: boolean
+  page?: number
+  total?: number
+  pageSize?: number
+  onPage?: (page: number) => void
   rows: readonly PreviewRow[]
   columns: readonly (readonly [string, ResourceText])[]
   r: (key: ResourceText) => string
@@ -17,14 +21,25 @@ export type ResourceTableProps = {
   selection?: readonly string[]
   onSelection?: (ids: string[]) => void
 }
-/** Render the source page's columns and per-row commands without business transport. */
+/** Render the source page's columns and per-row commands, with local or server-owned paging.
+ * @param props.page - Server page when `onPage` is supplied.
+ * @param props.total - Server total; defaults to the visible rows.
+ * @param props.onPage - Switches to controlled server paging.
+ */
 export function ResourceTable({
   rows, columns, r, cell, onOpen, actions, selection, onSelection, paginate = false, loading = false,
+  page, total, pageSize = 15, onPage,
 }: ResourceTableProps) {
-  const [page, setPage] = useState(1)
-  const pages = Math.max(1, paginate ? Math.ceil(rows.length / 15) : 1)
-  const current = Math.min(page, pages)
-  const visible = paginate ? rows.slice((current - 1) * 15, current * 15) : rows
+  const [localPage, setLocalPage] = useState(1)
+  const rowTotal = total ?? rows.length
+  const pages = Math.max(1, paginate ? Math.ceil(rowTotal / pageSize) : 1)
+  const current = Math.min(onPage ? page ?? 1 : localPage, pages)
+  const visible = onPage || !paginate ? rows : rows.slice((current - 1) * pageSize, current * pageSize)
+  const go = (next: number) => {
+    const target = Math.min(pages, Math.max(1, next))
+    if (onPage) onPage(target)
+    else setLocalPage(target)
+  }
   return <><div className={css.tableWrap} aria-busy={loading}><table className={css.table}><thead><tr>
     {onSelection && <th><input type="checkbox" aria-label={r('all')} checked={visible.length > 0 && visible.every(row => selection?.includes(row.id))} onChange={(event) =>{  onSelection(event.target.checked ? [...new Set([...(selection ?? []), ...visible.map(row => row.id)])] : (selection ?? []).filter(id => !visible.some(row => row.id === id))) }} /></th>}
     {columns.map(([key, label]) => <th key={key}>{r(label)}</th>)}{actions && <th>{r('operations')}</th>}
@@ -35,5 +50,5 @@ export function ResourceTable({
       {actions(row).map(action => <Button key={action.label} disabled={action.disabled} onClick={action.run}>{r(action.label)}</Button>)}
     </div></td>}
   </tr>)}</tbody></table>{loading ? <div className={css.tableSkeleton} role="status" /> : rows.length === 0 && <p className={css.empty}>{r('empty')}</p>}</div>
-  {!loading && <div className={css.pagination}><span>{r('total')} {rows.length}</span><Button disabled={current === 1} onClick={() => { setPage(current - 1) }}>{r('previous')}</Button><span>{current} / {pages}</span><Button disabled={current === pages} onClick={() => { setPage(current + 1) }}>{r('next')}</Button></div>}</>
+  {!loading && <div className={css.pagination}><span>{r('total')} {rowTotal}</span><Button disabled={current === 1} onClick={() => { go(current - 1) }}>{r('previous')}</Button><span>{current} / {pages}</span><Button disabled={current === pages} onClick={() => { go(current + 1) }}>{r('next')}</Button></div>}</>
 }

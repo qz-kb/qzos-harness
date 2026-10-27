@@ -1,4 +1,5 @@
 /** Private original downloads never put business credentials in navigation URLs. */
+import { qzosApiVersion } from './product-updates.ts'
 import { loginApi, loginCredentials, loginRecord, storedLogin, LoginError } from './login-client.ts'
 
 /** Fetch only a managed QZOS source, rejecting errors and stale identities before saving.
@@ -14,7 +15,7 @@ export async function downloadOriginal(path: string, signal: AbortSignal, expect
   const lifetime = AbortSignal.any([signal, AbortSignal.timeout(60000)])
   lifetime.throwIfAborted()
   const response = await fetch(`${loginApi}${path.slice(4)}`, {
-    headers: { token, terminal: '4', version: '4.8.0' }, credentials: loginCredentials, redirect: 'error', cache: 'no-store', signal: lifetime,
+    headers: { token, terminal: '4', version: qzosApiVersion }, credentials: loginCredentials, redirect: 'error', cache: 'no-store', signal: lifetime,
   })
   if (response.headers.get('Content-Type')?.includes('application/json')) {
     const error = loginRecord(await response.json())
