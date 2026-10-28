@@ -1,5 +1,5 @@
 .entry { display: flex; align-items: center; }
-.dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-left: 5px; }
+.dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-left: 5px; corner-shape: round; }
 .dialog { width: min(680px, 100%); max-height: 100%; }
 .content { min-height: 0; overflow-y: auto; }
 .filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
