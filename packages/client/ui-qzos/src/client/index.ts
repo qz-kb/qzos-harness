@@ -25,7 +25,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 /** Native presentation and draft services; no employee business transport. */
-export const inject = ['slots', 'locale', 'layout', 'sessions', 'workspaces', 'conversation', 'uiConversation', 'inputTriggers', 'uiWorkspace', 'resources']
+export const inject = ['slots', 'locale', 'layout', 'sessions', 'workspaces', 'conversation', 'uiConversation', 'inputTriggers', 'uiWorkspace', 'resources', 'remote', 'remote.session']
 
 /** Register removable QZOS UI contributions.
  * @param ctx - Browser plugin context.

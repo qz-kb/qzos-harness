@@ -1,5 +1,6 @@
 /** Employee entry creates an independent native conversation with authorized opening context. */
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { ReferenceInsert } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
@@ -21,6 +22,21 @@ declare module '@deepseek-ai/dsh-api-session-controller/client' {
 
 const sourceName = 'qzos-employee'
 type Translate = (key: QzosKey) => string
+
+/** Install the deployment default model so a fresh employee conversation is sendable without a manual pick.
+ * The composer's model seat remains the authority when the user changes it.
+ * @param ctx - Browser plugin context.
+ * @param sessionId - freshly created employee conversation.
+ */
+async function selectDefaultModel(ctx: Context, sessionId: SessionId): Promise<void> {
+  try {
+    const catalog = await ctx.remote.session.modelCatalog()
+    if (!catalog.ok) return
+    await ctx.remote.session.selectModel({ sessionId, ...catalog.value.default })
+  } catch {
+    // The model seat still exposes the catalog and its own retry surface.
+  }
+}
 
 /** Resolve a ready fixture into a source-owned native reference chip.
  * @param id - employee identity.
@@ -142,6 +158,7 @@ export function installEmployeeMentions(ctx: Context, t: Translate): ((id: strin
         const renamed = await retained.binding.session.rename(reference.label)
         if (!renamed.ok) throw new Error(t('employeeOpenFailed'))
         if (storedLogin(sessionStorage) !== token) throw new Error(t('unavailable'))
+        await selectDefaultModel(ctx, sessionId)
         insertEmployee(sessionId, reference)
         ctx.uiWorkspace.openSession(sessionId)
       })
