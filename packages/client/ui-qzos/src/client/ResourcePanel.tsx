@@ -1,6 +1,6 @@
 /** QZOS knowledge and employee pages reproduced inside an independent DSH panel. */
 import { useEffect, useRef, useState } from 'react'
-import { Button, Input, Modal, Tag, Menu, MenuItemButton, IconPlusOutlineRegular, IconUsersOutlineRegular, IconFolderOpenOutlineRegular, IconEllipsisOutlineRegular, IconChevronLeftOutlineRegular, IconSearchOutlineRegular, IconSettingsOutlineRegular, IconQueueOutlineRegular, IconEditOutlineRegular, IconTrashOutlineRegular, IconPaperPlaneOutlineRegular, IconQueueOutlineRegular as ChatIcon } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, Input, Modal, Tag, Menu, MenuItemButton, IconPlusOutlineRegular, IconUsersOutlineRegular, IconFolderOpenOutlineRegular, IconEllipsisOutlineRegular, IconChevronLeftOutlineRegular, IconSearchOutlineRegular, IconSettingsOutlineRegular, IconQueueOutlineRegular, IconEditOutlineRegular, IconTrashOutlineRegular, IconPaperPlaneOutlineRegular, IconNewChatOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PanelProps } from './Panel.tsx'
 import type { Example } from './catalog.ts'
 import { resourceModelDefaults } from './resource-models.ts'
@@ -41,7 +41,7 @@ function EmployeeCard({ item, onCommand, labels }: EmployeeCardProps) {
       </Menu>
     </div>
     <div className={css.employeeBody}><div className={css.avatar}>{item.values?.image ? <img src={item.values.image} alt="" /> : <IconUsersOutlineRegular size={24} />}</div><h2>{item.title}</h2><p>{item.description || labels.noIntro}</p></div>
-    <div className={css.employeeFooter}><Button aria-label={`${labels.settings} · ${item.title}`} onClick={() =>{  onCommand('edit', item) }}><IconPaperPlaneOutlineRegular size={16} />{labels.settings}</Button><Button disabled={item.status !== 'ready'} aria-label={`${labels.chat} · ${item.title}`} onClick={() =>{  onCommand('chat', item) }}><ChatIcon size={16} />{labels.chat}</Button></div>
+    <div className={css.employeeFooter}><Button aria-label={`${labels.settings} · ${item.title}`} onClick={() =>{  onCommand('edit', item) }}><IconSettingsOutlineRegular size={16} />{labels.settings}</Button><Button disabled={item.status !== 'ready'} aria-label={`${labels.chat} · ${item.title}`} onClick={() =>{  onCommand('chat', item) }}><IconNewChatOutlineRegular size={16} />{labels.chat}</Button></div>
   </article>
 }
 
@@ -192,7 +192,7 @@ export function ResourcePanel(props: ResourcePanelProps) {
         <div className={css.asideTitle}><Button aria-label={t('back')} onClick={() =>{  actions.setDetail(panel, null) }}><IconChevronLeftOutlineRegular size={18} /></Button>
           {panel === 'employees' ? <select aria-label={t('employees')} value={item.id} onChange={(event) => { const target = records.find(record => record.id === event.target.value); if (target) open(target, 'edit') }}>{records.map(record => <option key={record.id} value={record.id}>{record.title}</option>)}</select> : <strong>{item.title}</strong>}
         </div>
-        {menus.map(([tab, key]) => <Button key={tab} aria-pressed={section === tab} onClick={() => { if (tab === 'chat') employeeCommand('chat', item); else actions.setSection(panel, tab) }}>{panel === 'employees' ? tab === 'edit' ? <IconSettingsOutlineRegular size={16} /> : tab === 'release' ? <IconPaperPlaneOutlineRegular size={16} /> : <ChatIcon size={16} /> : (tab === 'dataStudy' ? <IconQueueOutlineRegular size={16} /> : tab === 'testData' ? <IconSearchOutlineRegular size={16} /> : tab === 'teamData' ? <IconUsersOutlineRegular size={16} /> : <IconSettingsOutlineRegular size={16} />)}{r(key)}</Button>)}
+        {menus.map(([tab, key]) => <Button key={tab} aria-pressed={section === tab} onClick={() => { if (tab === 'chat') employeeCommand('chat', item); else actions.setSection(panel, tab) }}>{panel === 'employees' ? tab === 'edit' ? <IconSettingsOutlineRegular size={16} /> : tab === 'release' ? <IconPaperPlaneOutlineRegular size={16} /> : <IconNewChatOutlineRegular size={16} /> : (tab === 'dataStudy' ? <IconQueueOutlineRegular size={16} /> : tab === 'testData' ? <IconSearchOutlineRegular size={16} /> : tab === 'teamData' ? <IconUsersOutlineRegular size={16} /> : <IconSettingsOutlineRegular size={16} />)}{r(key)}</Button>)}
       </aside>
       <div className={css.detailBody}>{panel === 'knowledge'
         ? <KnowledgeDetail key={`${item.id}:${section}`} {...props} item={item} section={section} onDelete={() =>{  setDeleting(item) }} modelOptions={modelOptions} />

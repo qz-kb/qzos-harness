@@ -1,8 +1,8 @@
-import { expect, it, vi, afterEach } from 'vitest'
+﻿import { expect, it, vi, afterEach } from 'vitest'
 import { readProductUpdates, visibleReleases, qzosSurface, qzosVersionedUrl } from '../src/client/product-updates.ts'
 afterEach(() => vi.unstubAllGlobals())
-const reply = () => ({ schema: 'qzos.product-updates.v1', server_version: '2.13.0', compatibility: { status: 'compatible', message: '' }, releases: [
-  { version: '2.13.0', date: '2026-10-24', components: { web: '2.13.0' }, changes: [
+const reply = () => ({ schema: 'qzos.product-updates.v1', server_version: '2.14.0', compatibility: { status: 'compatible', message: '' }, releases: [
+  { version: '2.14.0', date: '2026-10-24', components: { web: '2.14.0' }, changes: [
     { kind: 'fix', text: '<script>plain text</script>', surfaces: ['web'] },
     { kind: 'feature', text: 'admin only', surfaces: ['admin'] },
   ] },
@@ -30,7 +30,8 @@ it('declares desktop only for the existing native carrier, without invoking upda
 it('preserves business queries without requiring new cross-origin headers', () => {
   const url = new URL(qzosVersionedUrl('https://business.invalid/api/kb.know/lists?type=0'))
   expect(url.searchParams.get('type')).toBe('0')
-  expect(url.searchParams.get('qzos_version')).toBe('2.13.0')
+  expect(url.searchParams.get('qzos_version')).toBe('2.14.0')
   expect(url.searchParams.get('qzos_surface')).toBe('web')
   expect(url.username).toBe('')
 })
+

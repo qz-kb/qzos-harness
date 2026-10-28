@@ -1,5 +1,5 @@
 /** QZOS client identity is independent from the upstream DSH runtime version. */
-export const qzosClientVersion = '2.13.0'
+export const qzosClientVersion = '2.14.0'
 /** QZOS API protocol version; a Host may inject a newer value at startup. */
 export const qzosApiVersion = (globalThis as typeof globalThis & { __QZOS_API_VERSION__?: string }).__QZOS_API_VERSION__ ?? '4.8.0'
 /** Detect the carrier without invoking or replacing its update controls.

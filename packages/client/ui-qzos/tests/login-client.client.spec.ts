@@ -1,4 +1,4 @@
-import { afterEach, expect, it, vi } from 'vitest'
+﻿import { afterEach, expect, it, vi } from 'vitest'
 import { loginApi, loginRequest, loginSessionKey, LoginError, storedLogin } from '../src/client/login-client.ts'
 
 afterEach(() => { vi.unstubAllGlobals(); vi.resetModules() })
@@ -6,7 +6,7 @@ it('keeps QZOS credentials separate from Host cookies and handles business rejec
   const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 1, data: { token: 'synthetic' } })))
   vi.stubGlobal('fetch', fetcher)
   expect(await loginRequest('/login/account', { scene: 1, mobile: 'test', password: 'synthetic', terminal: 4 })).toEqual({ token: 'synthetic' })
-  expect(fetcher.mock.calls[0]?.[0]).toBe(`${loginApi}/login/account?qzos_surface=web&qzos_version=2.13.0`)
+  expect(fetcher.mock.calls[0]?.[0]).toBe(`${loginApi}/login/account?qzos_surface=web&qzos_version=2.14.0`)
   const options = fetcher.mock.calls[0]?.[1] as RequestInit
   expect(options.credentials).toBe('omit')
   expect(options.redirect).toBe('error')
@@ -50,7 +50,7 @@ it('uses managed gateway cookies without reading a browser business credential',
   expect(managed.storedLogin({ getItem } as unknown as Storage)).toBe('managed:42')
   expect(getItem).not.toHaveBeenCalled()
   expect(await managed.loginRequest('/user/info')).toEqual({ id: 42 })
-  expect(fetcher.mock.calls[0]?.[0]).toBe('https://work.invalid/u/42/_qzos/business/user/info?qzos_surface=web&qzos_version=2.13.0')
+  expect(fetcher.mock.calls[0]?.[0]).toBe('https://work.invalid/u/42/_qzos/business/user/info?qzos_surface=web&qzos_version=2.14.0')
   expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ credentials: 'same-origin' })
   fetcher.mockResolvedValue(new Response('{}', { status: 401 }))
   await expect(managed.loginRequest('/user/info')).rejects.toThrow('HTTP 401')
@@ -74,3 +74,4 @@ it('keeps managed originals authenticated and public links outside the private g
   vi.stubGlobal('__QZOS_PUBLIC_VISITOR_ORIGIN__', 'https://visitor.invalid')
   expect((await import('../src/client/login-client.ts')).publicVisitorApi).toBe('https://visitor.invalid')
 })
+
