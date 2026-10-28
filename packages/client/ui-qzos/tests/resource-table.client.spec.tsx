@@ -15,7 +15,8 @@ it('selects only the current page and retains prior selections', () => {
   expect(change).toHaveBeenCalledWith(['1', '16'])
   view.rerender(<ResourceTable paginate rows={rows.slice(0, 1)} columns={[[ 'name', 'name' ]]} r={key => key} />)
   expect(screen.getByRole('cell', { name: 'fragment-1' })).toBeDefined()
-  expect((screen.getByRole('button', { name: 'next' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(screen.queryByRole('button', { name: 'next' })).toBeNull()
+  expect(screen.getByText('total 1')).toBeDefined()
 })
 it('uses server page and total without slicing the supplied rows', () => {
   const change = vi.fn()

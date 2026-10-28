@@ -50,5 +50,5 @@ export function ResourceTable({
       {actions(row).map(action => <Button key={action.label} disabled={action.disabled} onClick={action.run}>{r(action.label)}</Button>)}
     </div></td>}
   </tr>)}</tbody></table>{loading ? <div className={css.tableSkeleton} role="status" /> : rows.length === 0 && <p className={css.empty}>{r('empty')}</p>}</div>
-  {!loading && <div className={css.pagination}><span>{r('total')} {rowTotal}</span><Button disabled={current === 1} onClick={() => { go(current - 1) }}>{r('previous')}</Button><span>{current} / {pages}</span><Button disabled={current === pages} onClick={() => { go(current + 1) }}>{r('next')}</Button></div>}</>
+  {!loading && <div className={css.pagination}><span>{r('total')} {rowTotal}</span>{pages > 1 && <><Button disabled={current === 1} onClick={() => { go(current - 1) }}>{r('previous')}</Button><span>{current} / {pages}</span><Button disabled={current === pages} onClick={() => { go(current + 1) }}>{r('next')}</Button></>}</div>}</>
 }
