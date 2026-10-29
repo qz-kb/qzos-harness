@@ -127,9 +127,39 @@ export async function execution(
   }
   // A crashed request has no trustworthy usage. Recover its identity, never replay its model call.
   for (const [key, item] of receipts.entries()) if (item.issued) await receipts.put(key, { ...item, issued: false })
+  const retrieveRequest = async (auth: Credential, input: object, signal: AbortSignal): Promise<unknown> => {
+    const active = AbortSignal.any([signal, lifetime.signal])
+    let transportRecovered = false
+    for (;;) {
+      active.throwIfAborted()
+      try { return await signed(auth, 'retrieve', input, active) }
+      catch (error) {
+        active.throwIfAborted()
+        if (error instanceof RetrievalPending) {
+          // Keep the current turn and identity while the server's original request finishes.
+          await delay(Math.min(1000, config.requestTimeoutMs), undefined, { signal: active })
+          continue
+        }
+        if (!(error instanceof ReceiptTransportError)) throw error
+        if (transportRecovered) throw new Error('知识检索连接中断，自动恢复未成功，请稍后重新提问；本次已发生的用量保留核对。')
+        transportRecovered = true
+      }
+    }
+  }
+  const search = async (auth: Credential, session: SessionId, question: string, signal: AbortSignal): Promise<unknown> => {
+    await drain(auth)
+    const bound = binding(session)
+    if (!bound) throw new Error('请先打开该员工会话')
+    const turn = turns.get(session)?.turn
+    if (turn === undefined) throw new Error('当前消息尚未准备检索，请重新发送')
+    return retrieveRequest(auth, {
+      call_id: randomUUID(), robot_id: Number(bound.employeeId), session_id: session, turn_id: String(turn), question,
+    }, signal)
+  }
   const attach = (agent: Agent) => {
     if (attached.has(agent) || !binding(agent.session.id)) return
-    installTools(agent, config, credential, binding, signed)
+    installTools(agent, config, credential, binding, signed,
+      (auth, question, signal) => search(auth, agent.session.id, question, signal))
     attached.add(agent)
   }
   ctx.on('llm/stream', async function* (options, next) {
@@ -175,24 +205,9 @@ export async function execution(
       const hash = createHash('sha256').update(JSON.stringify([auth.userId, session, employeeId, turn, question])).digest('hex')
       const callId = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20, 32)}`
       const input = { call_id: callId, robot_id: Number(employeeId), session_id: session, turn_id: String(turn), question }
-      const active = AbortSignal.any([signal, lifetime.signal])
-      let transportRecovered = false
-      for (;;) {
-        active.throwIfAborted()
-        try { return await signed(auth, 'retrieve', input, active) }
-        catch (error) {
-          active.throwIfAborted()
-          if (error instanceof RetrievalPending) {
-            // Keep the current turn and identity while the server's original request finishes.
-            await delay(Math.min(1000, config.requestTimeoutMs), undefined, { signal: active })
-            continue
-          }
-          if (!(error instanceof ReceiptTransportError)) throw error
-          if (transportRecovered) throw new Error('知识检索连接中断，自动恢复未成功，请稍后重新提问；本次已发生的用量保留核对。')
-          transportRecovered = true
-        }
-      }
+      return retrieveRequest(auth, input, signal)
     },
+    search,
     async prepare(session: SessionId, value: z.infer<typeof metadata>) {
       const previous = turns.get(session)
       // Tool continuation carries no new user message; retain the turn's original evidence.

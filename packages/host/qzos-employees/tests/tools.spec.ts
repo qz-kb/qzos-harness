@@ -9,6 +9,7 @@ function fixture(approvals: string[], unknown = false) {
   const requests: { path: string; body: Record<string, unknown> }[] = []
   let auth: { userId: string; token: string } | undefined = { userId: '1', token: 'synthetic' }
   const approve = vi.fn(async () => approvals.shift() ?? 'rejected')
+  const search = vi.fn(async () => [{ kb_id: 29, question: '仓储降本', answer: '按容量计费' }])
   const agent = {
     session: { id: 'synthetic-session' },
     ctx: {
@@ -30,15 +31,16 @@ function fixture(approvals: string[], unknown = false) {
       : { id: 9, status: 'succeeded' } })
   })
   installTools(agent, { apiUrl: 'http://synthetic.invalid/api', requestTimeoutMs: 1000 }, () => auth,
-    () => ({ userId: '1', employeeId: '7' }), async () => ({}))
-  const run = (action: string) => {
-    const tool = definitions.get('qzos_employee_plugin')
-    if (!tool) throw new Error('Missing tool')
-    return tool.execute({ connection_id: 1, action_key: action, params: {} }, {
+    () => ({ userId: '1', employeeId: '7' }), async () => ({}), search)
+  const runTool = (name: string, args: object) => {
+    const tool = definitions.get(name)
+    if (!tool) throw new Error(`Missing tool ${name}`)
+    return tool.execute(args, {
       agent, name: tool.name, callId: 'call-1', signal: new AbortController().signal,
     } as ToolRunContext)
   }
-  return { run, requests, approve, logout() { auth = undefined } }
+  const run = (action: string) => runTool('qzos_employee_plugin', { connection_id: 1, action_key: action, params: {} })
+  return { run, runTool, requests, approve, search, logout() { auth = undefined } }
 }
 afterEach(() => { vi.unstubAllGlobals() })
 it('does not dispatch a mutation without native approval', async () => {
@@ -70,4 +72,11 @@ it('revokes tools on logout before any business request', async () => {
   const test = fixture([]); test.logout()
   await expect(test.run('read')).rejects.toThrow('账号已变化')
   expect(test.requests).toHaveLength(0)
+})
+it('searches bound knowledge through the trusted adapter without approval', async () => {
+  const test = fixture([])
+  const result = await test.runTool('qzos_knowledge_search', { query: '仓储客户降本' })
+  expect(result).toEqual({ query: '仓储客户降本', results: [{ kb_id: 29, question: '仓储降本', answer: '按容量计费' }] })
+  expect(test.search).toHaveBeenCalledWith(expect.objectContaining({ userId: '1' }), '仓储客户降本', expect.any(AbortSignal))
+  expect(test.approve).not.toHaveBeenCalled()
 })

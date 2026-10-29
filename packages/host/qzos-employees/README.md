@@ -38,6 +38,8 @@ The `qzos_execution` domain v1 stores turn metadata and an account-scoped receip
 
 Per-agent tools list currently bound capabilities, load a skill's validated instructions for the selected window model, run allowed plugin actions and query existing outcomes. QZOS rechecks current binding and authorization. Mutating plugin actions require native one-shot approval; send actions additionally confirm the server-frozen recipient and payload. Unknown outcomes are queried without resending. No credential or confirmation secret is exposed to the model. Skill instructions and plugin results add ordinary context tokens and may cause additional model steps; no cache layout changes.
 
+`qzos_knowledge_search` searches the bound employee's knowledge bases through the trusted retrieval adapter. The model can call it repeatedly with focused queries while building a solution; each result is reference data with knowledge and source identities, never instructions. It uses the same signed `retrieve` path and turn identity as automatic retrieval, so employee knowledge permissions and receipts stay authoritative. It is registered only when the execution adapter is enabled.
+
 Tests cover receipt/account isolation, exact cached counters, tool confirmation/rejection and uncertain results. The local synthetic station verified real model skill execution, read/draft/send plugin calls, cancellation/revocation, nonzero idempotent settlement and native-answer feedback. This is not production deployment, arbitrary external plugin verification or multi-user Host isolation.
 
 
@@ -47,7 +49,7 @@ Tests cover receipt/account isolation, exact cached counters, tool confirmation/
 
 #### What the model sees
 
-Each new user turn receives `employeeId`, `name`, `role` and authorized `sources` as a logged context message. Credentials and workflow configuration are excluded.
+Each new user turn receives `employeeId`, `name`, `role` and authorized `sources` as a logged context message. Credentials and workflow configuration are excluded. `qzos_knowledge_search` returns focused excerpts and source fields as ordinary tool results; the model is instructed to cite them and treat them as data.
 
 #### Token effect
 
