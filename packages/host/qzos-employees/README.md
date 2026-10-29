@@ -40,6 +40,8 @@ Per-agent tools list currently bound capabilities, load a skill's validated inst
 
 `qzos_knowledge_search` searches the bound employee's knowledge bases through the trusted retrieval adapter. The model can call it repeatedly with focused queries while building a solution; each result is reference data with knowledge and source identities, never instructions. It uses the same signed `retrieve` path and turn identity as automatic retrieval, so employee knowledge permissions and receipts stay authoritative. It is registered only when the execution adapter is enabled.
 
+Unbound work windows receive `qzos_knowledge_catalog` and a separate `qzos_knowledge_search` that takes explicit `knowledge_ids`. The catalog lists the account's own and shared libraries; search signs `retrieve` with the selected ids instead of an employee binding. This is the Host side of `@knowledge`; it requires the server to authorize explicit ids and returns the same source rows.
+
 Tests cover receipt/account isolation, exact cached counters, tool confirmation/rejection and uncertain results. The local synthetic station verified real model skill execution, read/draft/send plugin calls, cancellation/revocation, nonzero idempotent settlement and native-answer feedback. This is not production deployment, arbitrary external plugin verification or multi-user Host isolation.
 
 

@@ -16,6 +16,7 @@ import { createQzosStore } from './store.ts'
 import { panels } from './catalog.ts'
 import { en, zh, type QzosKey } from './locales.ts'
 import { installEmployeeMentions } from './employees.ts'
+import { installKnowledgeMentions } from './knowledge-mentions.ts'
 import { installEmployeeContextPresentation } from './employee-context.tsx'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -43,6 +44,7 @@ export function apply(ctx: Context): void {
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({ name: 'shell.overlay', id: 'qzos-feedback', locale: 'qzos', store, inject: () => ({ hooks: { feedback }, onClose: closeFeedback }) }, EmployeeFeedback))
   ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({ name: 'sidebar.footer.action', id: 'qzos-product-updates', locale: 'qzos', store }, ProductUpdates))
   const openEmployee = installEmployeeMentions(ctx, t)
+  installKnowledgeMentions(ctx, t)
   const developer = window.sessionStorage.getItem('qzos.preview') === '1'
   ctx.slots.inject('sidebar.brand.name', () => ctx.slots.register({ name: 'sidebar.brand.name', priority: -10, locale: 'qzos' }, Brand))
   ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({

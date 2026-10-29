@@ -9,6 +9,7 @@ import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
 import { z } from 'zod'
 import { employee, type BusinessConfig } from './business.ts'
 import { installTools } from './tools.ts'
+import { installKnowledgeTools } from './knowledge-tools.ts'
 
 const metadata = z.object({
   userId: z.string(), employeeId: z.string(), turn: z.number().int(),
@@ -156,8 +157,22 @@ export async function execution(
       call_id: randomUUID(), robot_id: Number(bound.employeeId), session_id: session, turn_id: String(turn), question,
     }, signal)
   }
+  const searchKnowledge = async (auth: Credential, session: SessionId, knowledgeIds: readonly number[], question: string, signal: AbortSignal): Promise<unknown> => {
+    await drain(auth)
+    const turn = turns.get(session)?.turn ?? 0
+    return retrieveRequest(auth, {
+      call_id: randomUUID(), session_id: session, turn_id: String(turn), question, knowledge_ids: knowledgeIds,
+    }, signal)
+  }
   const attach = (agent: Agent) => {
-    if (attached.has(agent) || !binding(agent.session.id)) return
+    if (attached.has(agent)) return
+    if (!binding(agent.session.id)) {
+      installKnowledgeTools(agent, config, credential, (auth, knowledgeIds, question, signal) => (
+        searchKnowledge(auth, agent.session.id, knowledgeIds, question, signal)
+      ))
+      attached.add(agent)
+      return
+    }
     installTools(agent, config, credential, binding, signed,
       (auth, question, signal) => search(auth, agent.session.id, question, signal))
     attached.add(agent)
