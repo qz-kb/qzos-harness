@@ -223,6 +223,7 @@ export async function execution(
       return retrieveRequest(auth, input, signal)
     },
     search,
+    searchKnowledge,
     async prepare(session: SessionId, value: z.infer<typeof metadata>) {
       const previous = turns.get(session)
       // Tool continuation carries no new user message; retain the turn's original evidence.

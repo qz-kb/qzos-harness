@@ -205,3 +205,23 @@ it('continues pending retrieval in the same turn and cancels pending polling', a
     expect(bodies.length).toBe(count)
   } finally { await ctx.fiber.dispose(); vi.unstubAllGlobals() }
 })
+
+it('searches explicit knowledge ids without an employee binding', async () => {
+  const ctx = new Context(), auth = { userId: '1', token: 'synthetic' }
+  const calls: { action: string; body: Record<string, unknown> }[] = []
+  vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+    const action = url.split('/').at(-1) ?? ''
+    const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as Record<string, unknown>
+    calls.push({ action, body })
+    return Response.json({ code: 1, data: [{ kb_id: 29, question: '仓储降本', answer: '按容量计费' }] })
+  })
+  try {
+    await ctx.plugin(Storage); ctx.storage.backend.register('memory', new MemoryStorageBackend())
+    ctx.provide('storageDomain', new DomainFacility(ctx, { backend: 'memory', routes: {} }))
+    const bridge = await execution(ctx, { apiUrl: 'http://qzos.invalid/api', requestTimeoutMs: 1000 }, 's'.repeat(32), () => auth, () => undefined)
+    const rows = await bridge.searchKnowledge(auth, SessionId('knowledge-session'), [29, 26], '仓储客户降本', new AbortController().signal)
+    expect(rows).toEqual([{ kb_id: 29, question: '仓储降本', answer: '按容量计费' }])
+    expect(calls).toHaveLength(1)
+    expect(calls[0]).toMatchObject({ action: 'retrieve', body: { knowledge_ids: [29, 26], question: '仓储客户降本' } })
+  } finally { await ctx.fiber.dispose(); vi.unstubAllGlobals() }
+})
