@@ -69,6 +69,11 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
       table.push({ kind: 'global', name: '__QZOS_MANAGED_ACCOUNT__', value: config.ownerUserId })
     })
   }
+  if (config.execution) {
+    ctx.on('webserver/index-inject', (table) => {
+      table.push({ kind: 'global', name: '__QZOS_KNOWLEDGE_SEARCH__', value: true })
+    })
+  }
   if (config.publicVisitorOrigin) {
     const visitor = new URL(config.publicVisitorOrigin)
     if (!['http:', 'https:'].includes(visitor.protocol) || visitor.username || visitor.password || visitor.pathname !== '/' || visitor.search || visitor.hash) throw new Error('Invalid public visitor origin')

@@ -53,7 +53,10 @@ it.each([undefined, '1'])('persists bindings and checks account changes with Hos
     let plugin = ctx.plugin(Employees,config); await plugin.await()
     const injected: import('@deepseek-ai/dsh-host-webserver').IndexInjection[] = []
     ctx.emit('webserver/index-inject', injected)
-    expect(injected).toEqual(ownerUserId ? [{ kind:'global',name:'__QZOS_MANAGED_ACCOUNT__',value:ownerUserId }] : [])
+    expect(injected).toEqual([
+      ...(ownerUserId ? [{ kind: 'global', name: '__QZOS_MANAGED_ACCOUNT__', value: ownerUserId }] : []),
+      { kind: 'global', name: '__QZOS_KNOWLEDGE_SEARCH__', value: true },
+    ])
     const call = async (body: object) => nativeFetch(`${ctx.webServer.getOrigin()}/qzos/employees`,{ method:'POST',headers:{ 'Content-Type':'application/json' },body:JSON.stringify(body) })
     rejected=true; expect((await call({ action:'logout' })).status).toBe(403); rejected=false
     expect((await call({ action:'bind',token:'synthetic',sessionId:agent.session.id,employeeId:'7' })).status).toBe(200)

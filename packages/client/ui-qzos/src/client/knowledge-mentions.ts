@@ -16,6 +16,7 @@ type Translate = (key: QzosKey) => string
  * @param t - Localized QZOS copy.
  */
 export function installKnowledgeMentions(ctx: Context, t: Translate): void {
+  if ((globalThis as { __QZOS_KNOWLEDGE_SEARCH__?: boolean }).__QZOS_KNOWLEDGE_SEARCH__ !== true) return
   const lifetime = new AbortController()
   ctx.effect(() => () => { lifetime.abort() }, 'qzos knowledge mentions')
   let bases: readonly { id: string; name: string }[] = []
