@@ -20,7 +20,7 @@ This private browser plugin adds knowledge, digital employees, connectors, skill
 
 ## Use this package
 
-The Web bundle mounts `ui-qzos`. Removing the row restores the upstream presentation. Run `pnpm run dev:web --patch apps/web/tests/pin-browse-picker.overlay.yml --port 3081` with the root `.node-version`; keep launcher options before Web options.
+The Web bundle declares the private `packages/bundle/web-app/qzos.patch.yml` after its upstream and preset layers. This file mounts `ui-qzos` and `qzos-employees`; deployment overlays override the same stable row IDs. The upstream `cordis.patch.yml` contains no QZOS rows. Removing the private layer restores the upstream composition. Run `pnpm run dev:web --patch apps/web/tests/pin-browse-picker.overlay.yml --port 3081` with the root `.node-version`; keep launcher options before Web options.
 
 The QZOS sidebar name shadows the official build's default name at slot priority `-10`. Both plugins can remain mounted; removing QZOS reveals the upstream name again. The real-browser `apps/web/tests/qzos-brand.e2e.ts` check covers startup, removal and remounting, including the official build profile.
 

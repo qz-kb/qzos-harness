@@ -78,4 +78,4 @@ Third-party dependencies and their licenses are disclosed in [THIRD_PARTY_NOTICE
 
 ## QZOS UI development
 
-This private repository adds a [QZOS UI plugin](packages/client/ui-qzos/README.md) with a workbench, knowledge, digital employees, connectors, skills, templates and deliverables. This first slice uses synthetic data; business integration follows separately. Develop on `feature/dsh-ui` and integrate on `develop`.
+This private repository adds [QZOS resource pages](packages/client/ui-qzos/README.md) and an [employee Host adapter](packages/host/qzos-employees/README.md) over native DSH conversations. Knowledge, employees, connectors, skills and templates use QZOS business APIs; native DSH owns conversation execution. The private Web composition lives in `packages/bundle/web-app/qzos.patch.yml`, after upstream layers and before deployment overrides. Create task branches from the latest `develop`; adopt upstream releases with explicit merges and pin deployment to the tested source commit. Business-client, upstream runtime and product-release versions remain distinct.

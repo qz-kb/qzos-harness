@@ -21,7 +21,7 @@ kind: "package-reference"
 <a id="contract"></a>
 ## 契约
 
-Web 组合与 ui-qzos 一起加载本私有插件。`apiUrl` 指定本机 QZOS API，`requestTimeoutMs` 限制单次业务请求。POST `/qzos/employees` 沿原连接认证，支持 authorize、logout、bind。令牌仅存内存；`qzos_employees` 存储域按原生 Session ID 持久保存不可改绑的账号、员工与后端归属。原生分叉继承绑定。
+Web 组合与 ui-qzos 一起加载本私有插件。`apiUrl` 指定本机 QZOS API，`requestTimeoutMs` 限制单次业务请求。POST `/qzos/employees` 沿原连接认证，支持 authorize、logout、bind。令牌仅存内存；`qzos_employees` 存储域按原生 Session ID 持久保存不可改绑的账号、员工与后端归属。原生分叉在 `agent/created` 中沿 rc.5 Session 的 `parentSession` 继承绑定。回归测试调用真实 `SessionStore.fork`，并检查插件重载、员工暂停和退出后的继承授权。若上游版本移除分叉父级元数据，接入前须显式传递业务绑定；仅会话格式兼容不足以证明可升级。
 
 每个模型步骤前校验当前账号及员工可用性；有新用户输入时经授权检索知识，将允许的角色与片段通过 `agent/pre-step` 写入普通消息记录。DSH 保持执行与结果存储。未指定归属的本机预览中，账号切换取消上一账号的员工任务；Host 重启后需通过重新校验浏览器保存的业务会话或重新登录来恢复授权。移除时需同时移除本插件和对应浏览器接入。
 

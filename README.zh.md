@@ -97,4 +97,4 @@ pnpm dsh web
 
 ## QZOS 界面开发
 
-本私有仓库的首轮用户界面位于 [QZOS UI 插件](packages/client/ui-qzos/README.zh.md)，包含工作台、知识库、数字员工、连接器、技能、模板和成果。当前仅使用模拟数据，业务接入另行推进；开发分支为 `feature/dsh-ui`，集成主线为 `develop`。
+本私有仓库在 DSH 原生对话之上提供 [QZOS 资源页面](packages/client/ui-qzos/README.zh.md)与[员工 Host 适配器](packages/host/qzos-employees/README.zh.md)。知识库、员工、连接器、技能和模板接入 QZOS 业务 API，对话执行归原生 DSH。私有 Web 组合位于 `packages/bundle/web-app/qzos.patch.yml`，顺序为上游层、私有层、部署覆盖层。从最新 `develop` 建立任务分支，通过显式合并跟随上游发布，并将部署锁定到已验证源码提交。业务客户端版本、上游运行时版本与产品发布版本分别维护。

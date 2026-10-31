@@ -1,7 +1,7 @@
 /** Real HTTP + domain facility; only external business API and agent execution are controlled. */
 import { Context } from '@deepseek-ai/cordis'
 import { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
-import { Session, SessionId } from '@deepseek-ai/dsh-session'
+import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import Storage from '@deepseek-ai/dsh-storage'
 import { DomainFacility } from '@deepseek-ai/dsh-storage-domain'
@@ -22,11 +22,13 @@ it.each([undefined, '1'])('persists bindings and checks account changes with Hos
   let searches = 0
   let kbIds = [12]
   let rebindRequired = false
+  await ctx.plugin(SessionStore)
   const agentState: Pick<Agent, 'session' | 'status' | 'cancel' | 'ctx'> = {
-    ctx, session: Session.create(SessionId('employee-test')), status: 'idle', cancel: vi.fn<Agent['cancel']>(),
+    ctx, session: ctx.sessions.create(SessionId('employee-test')), status: 'idle', cancel: vi.fn<Agent['cancel']>(),
   }
   const agent = agentState as Agent
-  ctx.provide('agents', { get: (id: string) => id === agent.session.id ? agent : undefined } as never)
+  const agents = new Map([[agent.session.id, agent]])
+  ctx.provide('agents', { get: (id: string) => agents.get(SessionId(id)) } as never)
   ctx.provide('connection', { requestRejection: () => rejected ? 403 : undefined } as never)
   const input = createUserMessage({ source: { kind: 'user' }, content: [{ type: 'text', text: 'synthetic question' }] })
   const step = (messages = [input]) => agentEvents(ctx, agent).waterfall(
@@ -60,6 +62,17 @@ it.each([undefined, '1'])('persists bindings and checks account changes with Hos
     const call = async (body: object) => nativeFetch(`${ctx.webServer.getOrigin()}/qzos/employees`,{ method:'POST',headers:{ 'Content-Type':'application/json' },body:JSON.stringify(body) })
     rejected=true; expect((await call({ action:'logout' })).status).toBe(403); rejected=false
     expect((await call({ action:'bind',token:'synthetic',sessionId:agent.session.id,employeeId:'7' })).status).toBe(200)
+    // Exercise upstream fork metadata, not a hand-built parentSession fixture.
+    const childState: typeof agentState = {
+      ctx, session: ctx.sessions.fork(agent.session), status: 'idle', cancel: vi.fn<Agent['cancel']>(),
+    }
+    const child = childState as Agent
+    agents.set(child.session.id, child)
+    await agentEvents(ctx, child).serial('agent/created', { source: 'resume' })
+    const childStep = () => agentEvents(ctx, child).waterfall(
+      'agent/pre-step', { turn:1,step:1,messages:[input],signal:new AbortController().signal },
+      async () => ({ kind:'enter' as const,messages:[input] }),
+    )
     const first = await step()
     expect(JSON.stringify(first)).toContain('evidence-1')
     if (first.kind !== 'enter') throw new Error('Expected authorized employee input')
@@ -88,17 +101,23 @@ it.each([undefined, '1'])('persists bindings and checks account changes with Hos
     await expect(step()).rejects.toThrow('重新登录')
     await call({ action:'authorize',token:'synthetic' })
     expect(JSON.stringify(await step())).toContain('evidence-4')
+    expect(JSON.stringify(await childStep())).toContain('Researcher')
+    paused=true; await expect(childStep()).rejects.toThrow('暂停'); paused=false
     owner='2'
     const switched = await call({ action:'authorize',token:'other' })
     expect(switched.status).toBe(ownerUserId ? 403 : 200)
     if (ownerUserId) {
       expect(await switched.json()).toMatchObject({ code:'QZOS_HOST_ACCOUNT_MISMATCH' })
       owner='1'
-      expect(JSON.stringify(await step())).toContain('evidence-5')
+      expect(JSON.stringify(await step())).toContain('evidence-6')
       owner='2'
-    } else await expect(step()).rejects.toThrow('所属')
+    } else {
+      await expect(step()).rejects.toThrow('所属')
+      await expect(childStep()).rejects.toThrow('所属')
+    }
     expect((await call({ action:'bind',token:'other',sessionId:agent.session.id,employeeId:'7' })).status).toBe(ownerUserId ? 403 : 400)
     await call({ action:'logout' }); await expect(step()).rejects.toThrow('重新登录')
+    await expect(childStep()).rejects.toThrow('重新登录')
     await plugin.dispose()
     expect((await call({ action:'logout' })).status).toBe(404)
     if (ownerUserId) {
