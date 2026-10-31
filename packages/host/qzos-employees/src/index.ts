@@ -68,6 +68,10 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     ctx.on('webserver/index-inject', (table) => {
       table.push({ kind: 'global', name: '__QZOS_MANAGED_ACCOUNT__', value: config.ownerUserId })
     })
+  } else {
+    ctx.on('webserver/index-inject', (table) => {
+      table.push({ kind: 'global', name: '__QZOS_BUSINESS_API__', value: config.apiUrl })
+    })
   }
   if (config.execution) {
     ctx.on('webserver/index-inject', (table) => {

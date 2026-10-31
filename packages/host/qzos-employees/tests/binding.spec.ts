@@ -56,7 +56,9 @@ it.each([undefined, '1'])('persists bindings and checks account changes with Hos
     const injected: import('@deepseek-ai/dsh-host-webserver').IndexInjection[] = []
     ctx.emit('webserver/index-inject', injected)
     expect(injected).toEqual([
-      ...(ownerUserId ? [{ kind: 'global', name: '__QZOS_MANAGED_ACCOUNT__', value: ownerUserId }] : []),
+      ownerUserId
+        ? { kind: 'global', name: '__QZOS_MANAGED_ACCOUNT__', value: ownerUserId }
+        : { kind: 'global', name: '__QZOS_BUSINESS_API__', value: baseConfig.apiUrl },
       { kind: 'global', name: '__QZOS_KNOWLEDGE_SEARCH__', value: true },
     ])
     const call = async (body: object) => nativeFetch(`${ctx.webServer.getOrigin()}/qzos/employees`,{ method:'POST',headers:{ 'Content-Type':'application/json' },body:JSON.stringify(body) })

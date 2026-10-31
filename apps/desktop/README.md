@@ -385,6 +385,8 @@ Pre-launch CDN and capacity decisions are tracked in the [Desktop update proposa
 
 ## QZOS update deployment
 
+Packaging and artifact verification share the product name from `scripts/desktop-product.mjs`, including the macOS app bundle and executable and the Windows executable.
+
 This fork retains DSH's native update coordinator, task shutdown protection, download and restart confirmation. QZOS packages require their own application ID, download origin and policy origin; upstream DeepSeek identities and origins are rejected. Production machine presets must set `DOWNLOAD_PROD_ORIGIN`. Distribution uses `qzos-desktop` keys. The examples use `com.qzos.desktop`; signing identities, certificates and update service configuration must belong to the deployment operator. No signing credentials are shipped with the source.
 
 The shared product history in `ui-qzos` is read-only and identifies QZOS business-client compatibility independently of the bundled upstream DSH runtime version. It does not replace the native updater or turn viewing release notes into consent to install. Windows may use the explicitly configured unsigned HTTPS route; see [packaging](packaging/README.md#unsigned-windows-test-installer) and [self-hosted export](publishing/README.md#qzos-self-hosted). Real Windows installation and restart validation still requires an isolated Windows host and configured services. macOS signing requirements remain unchanged.
