@@ -181,7 +181,7 @@ export function ResourcePanel(props: ResourcePanelProps) {
         ? <KnowledgeDetail key={`${item.id}:${section}`} {...props} item={item} section={section} onDelete={() =>{  setDeleting(item) }} modelOptions={modelOptions} />
         : <EmployeeDetail key={`${item.id}:${section}`} {...props} item={item} section={section} knowledge={knowledge} modelDefaults={defaults} modelOptions={{ ...modelOptions, model_id: modelOptions.documents_model_id, optimize_m_id: modelOptions.documents_model_id }} onSaved={() => { props.refreshCatalog('employees') }} />}</div>
     </div>}
-    <Modal open={configuration !== null && nestedKnowledge === null} onClose={() =>{ if (!busy) setConfiguration(null) }} closeLabel={r('close')} className={(panel === 'knowledge' ? `${css.knowledgeDialog} ${css.knowledgeTheme}` : `${css.dialog} ${css.employeeDialog} ${css.knowledgeTheme}`) as string}
+    <Modal open={configuration !== null && nestedKnowledge === null} onClose={() =>{ if (!busy) setConfiguration(null) }} closeLabel={r('close')} className={(panel === 'knowledge' ? `${css.knowledgeDialog} ${css.knowledgeTheme}` : `${css.dialog} ${css.employeeDialog} ${css.knowledgeTheme}`)}
       title={panel === 'knowledge' ? configuration?.id === null ? r('newKnowledge') : r('editKnowledge') : r('newEmployeeTitle')}
       footer={<><Button variant="outline" disabled={busy} onClick={() =>{  setConfiguration(null) }}>{r(panel === 'knowledge' ? 'return' : 'cancel')}</Button><Button variant="primary" disabled={busy || optionsRemote.status !== 'live'} form="qzos-resource-form" type="submit">{r(panel === 'knowledge' ? 'save' : 'createConfigure')}</Button></>}>
       {notice && <p role="alert">{notice}</p>}

@@ -95,8 +95,10 @@ it('uploads new menu images while preserving existing URLs and the work-window e
     .mockResolvedValueOnce(reply({ uri: '/new-menu.png' }))
     .mockResolvedValueOnce(reply(null)).mockResolvedValueOnce(reply(original))
   await saveEmployee(original, employeeDraft(original), [{ keyword: 'help', content: 'reply', images: ['/existing.png', 'data:image/png;base64,eA=='] }], new AbortController().signal)
-  const edit = fetcher.mock.calls.find(([url]) => String(url).includes('/kb.robot/edit'))
-  const body = JSON.parse(String(edit?.[1]?.body))
+  const edit = fetcher.mock.calls.find(([url]) => typeof url === 'string' && url.includes('/kb.robot/edit'))
+  const encoded = edit?.[1]?.body
+  if (typeof encoded !== 'string') throw new Error('Expected JSON employee payload')
+  const body: unknown = JSON.parse(encoded)
   expect(body).toMatchObject({ use_work_window_model: 1, model_id: 2, model_sub_id: 3, menus: [{ keyword: 'help', images: ['/existing.png', '/new-menu.png'] }] })
-  expect(fetcher.mock.calls.filter(([url]) => String(url).includes('/upload/image'))).toHaveLength(1)
+  expect(fetcher.mock.calls.filter(([url]) => typeof url === 'string' && url.includes('/upload/image'))).toHaveLength(1)
 })

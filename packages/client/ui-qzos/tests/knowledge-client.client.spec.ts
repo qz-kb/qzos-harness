@@ -89,7 +89,7 @@ it.each(['knowledge', 'employees'])('retains %s cards and coalesces refreshes du
     let off = source.subscribe(() => {})
     await vi.waitFor(() => { expect(source.getSnapshot().status).toBe('live') })
     expect(fetcher).toHaveBeenCalledTimes(1)
-    expect(String(fetcher.mock.calls[0]?.[0])).toContain(panel === 'knowledge' ? '/kb.know/lists' : '/kb.robot/lists')
+    expect(fetcher.mock.calls[0]?.[0]).toContain(panel === 'knowledge' ? '/kb.know/lists' : '/kb.robot/lists')
     off(); off = source.subscribe(() => {})
     expect(source.getSnapshot().value).toEqual({ rows: [{ id: 1, name: 'first' }] })
     expect(fetcher).toHaveBeenCalledTimes(1)
@@ -129,7 +129,7 @@ it('refreshes legacy queued rows as well as staged incremental learning', () => 
 
 it('keeps authorized QZOS counters when the optional DSH usage endpoint is unavailable', async () => {
   const { fetcher } = setup()
-  fetcher.mockImplementation(async url => String(url).includes('/kb.dsh/summary')
+  fetcher.mockImplementation(async url => typeof url === 'string' && url.includes('/kb.dsh/summary')
     ? new Response('', { status: 404 }) : reply({ robot: { todayChatCount: 2 }, visitor: { wholeVisitorCount: 1 } }))
   const ctx = new Context(), registry = new ResourceRegistry(ctx)
   ctx.reflect.provide('resources', registry)

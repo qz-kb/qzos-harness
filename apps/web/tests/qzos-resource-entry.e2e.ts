@@ -110,7 +110,7 @@ it.skipIf(!process.env.QZOS_RESOURCE_TEST_ACCOUNT)('retains catalog cards and cr
     const refreshedList = page.waitForResponse(async (response) => {
       if (!response.url().includes('/kb.know/lists?')) return false
       const value = await response.json() as { data: { lists: { id: number }[] } }
-      return value.data.lists.some(row => Number(row.id) === knowledgeId)
+      return value.data.lists.some(row => row.id === knowledgeId)
     })
     releaseList!()
     await refreshedList
@@ -176,7 +176,7 @@ it.skipIf(!process.env.QZOS_RESOURCE_TEST_ACCOUNT)('retains catalog cards and cr
     await panel.getByRole('button', { name: '对话数据', exact: true }).first().click()
     await panel.getByText('昨日对话次数', { exact: true }).waitFor()
     const counts = await api(`/kb.chat/dataCount?robot_id=${employeeId}`)
-    expect(Number((counts.robot as { yesterdayChatCount: number }).yesterdayChatCount)).toBe(0)
+    expect((counts.robot as { yesterdayChatCount: number }).yesterdayChatCount).toBe(0)
     await expect.poll(() => panel.getByRole('alert').count()).toBe(0)
     await screenshot('employee-statistics')
     await page.setViewportSize({ width: 390, height: 844 })

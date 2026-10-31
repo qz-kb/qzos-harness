@@ -24,5 +24,5 @@ it('rejects too many images and prevents edits in the view dialog', () => {
   expect(change).not.toHaveBeenCalled()
   view.rerender(<EmployeeMenuImages images={['/existing.png']} onChange={change} onBusy={() => {}} disabled t={t} />)
   expect(screen.queryByLabelText('上传图片')).toBeNull()
-  expect((screen.getByRole('button') as HTMLButtonElement).disabled).toBe(true)
+  expect((screen.getByRole<HTMLButtonElement>('button')).disabled).toBe(true)
 })

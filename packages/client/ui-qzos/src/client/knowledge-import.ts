@@ -6,7 +6,12 @@ import { loginRecord, type LoginRecord } from './login-client.ts'
  * @param type - Selected QZOS import card.
  * @returns Method number, selectable extensions and server readiness.
  */
-export function knowledgeImportOptions(capabilities: LoginRecord, type: string) {
+export function knowledgeImportOptions(capabilities: LoginRecord, type: string): {
+  method: number
+  extensions: string[]
+  available: boolean
+  mode: 'server' | 'browser' | 'unavailable'
+} {
   const method = type === 'qaSplit' ? 2 : type === 'qaImport' ? 3 : type === 'webImport' ? 4 : 1
   const name = method === 1 ? 'document' : method === 2 ? 'qa_split' : method === 3 ? 'csv' : 'web_page'
   const option = loginRecord(loginRecord(capabilities.methods ?? {})[String(method)] ?? {})

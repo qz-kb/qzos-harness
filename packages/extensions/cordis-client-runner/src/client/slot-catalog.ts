@@ -3447,6 +3447,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [
       'client-ui-chat QuotaNoticeHost id \'chat.quota-notice\'',
       'client-ui-plugin-manager PluginRefreshToast id \'plugin-manager.refresh-toast\'',
+      'client-ui-qzos CatalogRetention id \'qzos-catalogs\'',
       'client-ui-qzos EmployeeFeedback id \'qzos-feedback\'',
       'client-ui-qzos Login id \'qzos-login\'',
       'client-ui-schedule ScheduleDeleteToast id \'schedule.delete-toast\'',

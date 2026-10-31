@@ -24,7 +24,7 @@ export function EmployeeMenuImages({ images, onChange, disabled, onBusy, t }: Pr
             if (typeof reader.result === 'string') resolve(reader.result)
             else reject(new Error('Invalid image'))
           }
-          reader.onerror = () => { reject(reader.error) }
+          reader.onerror = () => { reject(new Error(reader.error?.message ?? 'Image read failed')) }
           reader.readAsDataURL(file)
         }))).then((values) => { if (active.current) onChange([...images, ...values]) })
           .catch(() => { if (active.current) setError(true) })
