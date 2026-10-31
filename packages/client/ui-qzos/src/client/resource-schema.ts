@@ -34,7 +34,8 @@ export const resourceForms = {
       'id': 'embedding_model_id',
       'label': 'pc3',
       'kind': 'select',
-      'initial': 'embedding',
+      'initial': '',
+      'required': true,
       'locked': true,
       'options': [
         {
@@ -47,8 +48,8 @@ export const resourceForms = {
       'id': 'documents_model_id',
       'label': 'pc5',
       'kind': 'select',
-      'initial': 'deepseek',
-      'locked': true,
+      'initial': '',
+      'required': true,
       'options': [
         {
           'value': 'deepseek',
@@ -58,6 +59,7 @@ export const resourceForms = {
     },
     {
       'id': 'image',
+      'required': true,
       'label': 'pc7',
       'kind': 'image',
       'initial': '',
@@ -81,7 +83,8 @@ export const resourceForms = {
       'id': 'embedding_model_id',
       'label': 'pc3',
       'kind': 'select',
-      'initial': 'embedding',
+      'initial': '',
+      'required': true,
       'locked': true,
       'options': [
         {
@@ -94,8 +97,8 @@ export const resourceForms = {
       'id': 'documents_model_id',
       'label': 'pc5',
       'kind': 'select',
-      'initial': 'deepseek',
-      'locked': true,
+      'initial': '',
+      'required': true,
       'options': [
         {
           'value': 'deepseek',

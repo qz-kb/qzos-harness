@@ -42,7 +42,7 @@ export function employeeDraft(row: LoginRecord): PreviewValues {
 export function employeePayload(original: LoginRecord, draft: PreviewValues, menus: LoginRecord[]): LoginRecord {
   employeeDraft(original)
   const kbIds = (draft.kb_ids ?? '').split(',').filter(Boolean).map(Number)
-  const result: LoginRecord = { ...original, ...draft, menus, kb_ids: kbIds, search_mode: draft.search_mode === 'semantic' ? 'similar' : draft.search_mode }
+  const result: LoginRecord = { ...original, use_work_window_model: 1, ...draft, menus, kb_ids: kbIds, search_mode: draft.search_mode === 'semantic' ? 'similar' : draft.search_mode }
   for (const key of ['model_id', 'optimize_m_id']) {
     const [main, sub] = (draft[key] ?? '').split(':')
     result[key] = Number(main) || 0; result[key === 'model_id' ? 'model_sub_id' : 'optimize_s_id'] = Number(sub) || 0
@@ -77,11 +77,18 @@ export async function employeeImage(image: string, signal: AbortSignal, token: s
  * @param draft - Current form values.
  * @param menus - Shortcut menus to preserve or save.
  * @param signal - View lifetime cancellation.
+ * @returns Fresh configuration read after the write.
  */
-export async function saveEmployee(original: LoginRecord, draft: PreviewValues, menus: LoginRecord[], signal: AbortSignal): Promise<void> {
+export async function saveEmployee(
+  original: LoginRecord, draft: PreviewValues, menus: LoginRecord[], signal: AbortSignal,
+): Promise<LoginRecord> {
   const token = storedLogin(sessionStorage)
   const payload = employeePayload(original, draft, menus)
   payload.image = await employeeImage(knowledgeText(payload.image), signal, token)
+  payload.menus = await Promise.all(menus.map(async menu => ({
+    ...menu, images: await Promise.all((Array.isArray(menu.images) ? menu.images : [])
+      .map(image => employeeImage(knowledgeText(image), signal, token))),
+  })))
   payload.icons = await employeeImage(knowledgeText(payload.icons), signal, token)
   await knowledgeRequest('/kb.robot/edit', payload, signal, token)
   const saved = loginRecord(await knowledgeRequest(`/kb.robot/detail?id=${encodeURIComponent(knowledgeText(original.id))}`, undefined, signal, token))
@@ -91,6 +98,7 @@ export async function saveEmployee(original: LoginRecord, draft: PreviewValues, 
     const actual = (savedDraft.kb_ids ?? '').split(',').filter(Boolean).sort()
     if (saved.knowledge_rebind_required || JSON.stringify(expected) !== JSON.stringify(actual)) throw new Error('知识库关联保存回读不一致，请刷新核对后重试')
   }
+  return saved
 }
 
 /** Scope a pending correction to its backend, account and conversation record.

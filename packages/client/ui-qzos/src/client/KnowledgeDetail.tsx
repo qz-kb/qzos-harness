@@ -1,6 +1,6 @@
 /** Knowledge learning, search, member and settings views from the QZOS user client. */
 import { useEffect, useRef, useState } from 'react'
-import { Button, Input, Modal, IconChevronLeftOutlineRegular, IconRefreshOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, Input, Modal, IconChevronLeftOutlineRegular, IconRefreshOutlineRegular, IconUsersOutlineRegular, Tag } from '@deepseek-ai/dsh-client-ui-primitives'
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import type { PanelProps } from './Panel.tsx'
 import type { Example } from './catalog.ts'
@@ -9,10 +9,12 @@ import { resourceDraft, type PreviewValues, type ResourceForm } from './resource
 import { ResourceFields } from './ResourceForms.tsx'
 import { ResourceTable } from './ResourceTable.tsx'
 import { resourceCopy, type ResourceText } from './resource-copy.ts'
-import { knowledgeRequest as requestKnowledge, knowledgeRows, knowledgeText, knowledgeSearchInput, knowledgeDraft, knowledgeTable, saveKnowledge } from './knowledge-client.ts'
+import { knowledgeRequest as requestKnowledge, knowledgeRows, knowledgeText, knowledgeSearchInput, knowledgeDraft, knowledgeTable, saveKnowledge, knowledgeLearningPending } from './knowledge-client.ts'
 import { loginRecord, storedLogin } from './login-client.ts'
 import { KnowledgeParse } from './KnowledgeParse.tsx'
 import { KnowledgeFile } from './KnowledgeFile.tsx'
+import { knowledgeImportOptions, acceptsKnowledgeFiles } from './knowledge-import.ts'
+import { KnowledgeMembers } from './KnowledgeMembers.tsx'
 import { KnowledgeAcl } from './KnowledgeAcl.tsx'
 import { sourceCitation } from './knowledge-source.ts'
 import css from './Resources.module.css'
@@ -29,7 +31,7 @@ export function KnowledgeDetail(props: KnowledgeDetailProps) {
   const epoch = props.useStore(state => state.businessEpoch)
   const remote = props.useResource<'qzos-knowledge'>(`dsh-resource://qzos-knowledge/detail?id=${props.item.id}&epoch=${epoch}`)
   if (remote.status === 'failed') return <p role="alert">{remote.failure?.message}</p>
-  if (!remote.value) return <p role="status">{props.t('kbLoading')}</p>
+  if (!remote.value) return <div className={css.cardSkeleton} role="status" aria-label={props.t('catalogLoading')} />
   const detail = loginRecord(remote.value.detail)
   return <KnowledgeContent {...props} detail={detail} />
 }
@@ -57,7 +59,8 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
   const [parseFile, setParseFile] = useState<PreviewRow | null>(null)
   const [versionTarget, setVersionTarget] = useState<PreviewRow | null>(null)
   const [urls, setUrls] = useState('')
-  const [content, setContent] = useState('')
+  const [webPages, setWebPages] = useState<{ name: string; content: string }[]>([])
+  const [previewFile, setPreviewFile] = useState('')
   const [question, setQuestion] = useState('')
   const [tested, setTested] = useState(false)
   const [hits, setHits] = useState<Record<string, unknown>[]>([])
@@ -80,23 +83,57 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
   const [confirmation, setConfirmation] = useState<{ key: string; ids: string[] } | null>(null)
   const [notice, setNotice] = useState('')
   const [estimate, setEstimate] = useState('')
+  const [attachments, setAttachments] = useState<Record<'images' | 'files' | 'video', Record<string, unknown>[]>>({ images: [], files: [], video: [] })
   const documentsKey = `${item.id}:documents`
   const fragmentsKey = `${item.id}:fragments:${document?.id ?? ''}`
   const membersKey = `${item.id}:members`
   const documentsResource = useResource<'qzos-knowledge'>(section === 'dataStudy' || section === 'testData' ? `dsh-resource://qzos-knowledge/files?id=${item.id}&epoch=${epoch}&revision=${revision}` : '')
   const fragmentsResource = useResource<'qzos-knowledge'>(document && mode === 'fragments' ? `dsh-resource://qzos-knowledge/fragments?id=${item.id}&fd=${document.id}&epoch=${epoch}&revision=${revision}` : '')
   const membersResource = useResource<'qzos-knowledge'>(section === 'teamData' || dialog?.kind === 'acl' ? `dsh-resource://qzos-knowledge/members?id=${item.id}&epoch=${epoch}&revision=${revision}` : '')
+  const capabilitiesResource = useResource<'qzos-knowledge'>(mode === 'import' ? `dsh-resource://qzos-knowledge/import-capabilities?epoch=${epoch}&revision=${revision}` : '')
+  const capabilities = loginRecord(capabilitiesResource.value?.capabilities ?? {})
+  const importOptions = knowledgeImportOptions(capabilities, importType)
+  const selectFiles = (incoming: File[]) => {
+    if (busy || !importOptions.available) return
+    if (!acceptsKnowledgeFiles(incoming, importOptions.extensions, Boolean(versionTarget))) { setNotice(t('knowledgeFileRejected')); return }
+    imports.current.clear(); originals.current.clear(); setPreviews([]); setFiles(incoming); setPreviewFile(''); setNotice('')
+  }
   const documents = documentsResource.value ? knowledgeTable(knowledgeRows(documentsResource.value.rows), 'files') : []
   const fragments = fragmentsResource.value ? knowledgeTable(knowledgeRows(fragmentsResource.value.rows), 'fragments') : []
   const members = membersResource.value ? knowledgeTable(knowledgeRows(membersResource.value.rows), 'members') : []
+  useEffect(() => {
+    if (section !== 'dataStudy' || busy) return
+    const resource = mode === 'documents' ? documentsResource : mode === 'fragments' ? fragmentsResource : null
+    if (!resource?.value || resource.status !== 'live') return
+    const active = mode === 'fragments' ? knowledgeLearningPending(resource.value) : knowledgeRows(resource.value.rows).some((row) => {
+      const parse = loginRecord(row.parse ?? {})
+      const processing = loginRecord(parse.processing ?? {})
+      return Boolean(parse.processing) && !processing.cancelled && processing.stage !== 'done' && !processing.hold_reason && !parse.can_retry
+    })
+    if (!active) return
+    const timer = setTimeout(() => { setRevision(value => value + 1) }, 5000)
+    return () => { clearTimeout(timer) }
+  }, [section, mode, busy, documentsResource.value, documentsResource.status, fragmentsResource.value, fragmentsResource.status])
   const knowledge = useStore(state => state.knowledge)
   const owned = Number(detail.owned) === 1
+  const manageable = Number(detail.power) === 1
   const editable = [1, 2].includes(Number(detail.power))
 
   const update = (key: string, value: string) =>{  setDraft(current => ({ ...current, [key]: value })) }
   const show = (kind: Dialog['kind'], row?: PreviewRow) => {
     setEstimate('')
     setDialogDraft(resourceDraft(kind === 'parameters' ? draft : row ? { ...row } : {}))
+    if (kind === 'fragment' && row) {
+      void perform(async () => {
+        const original = loginRecord(await knowledgeRequest(`/kb.teach/detail?uuid=${encodeURIComponent(row.id)}`))
+        setDialogDraft(resourceDraft({ ...row, question: knowledgeText(original.question), answer: knowledgeText(original.answer) }))
+        setAttachments({
+          images: knowledgeRows(original.images), files: knowledgeRows(original.files), video: knowledgeRows(original.video),
+        })
+        setDialog({ kind, row })
+      }); return
+    }
+    if (kind === 'fragment') setAttachments({ images: [], files: [], video: [] })
     setDialog({ kind, ...row ? { row } : {} })
   }
   const openDocument = (row: PreviewRow) => {
@@ -107,15 +144,7 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
     if (dialog.kind === 'parameters') { setDraft(current => ({ ...current, ...dialogDraft })); setDialog(null); return }
     if (dialog.kind === 'rename') await knowledgeRequest('/kb.know/fileRename', { fd_id: Number(dialog.row?.id), name: dialogDraft.name })
     if (dialog.kind === 'fragment') {
-      const original = dialog.row ? loginRecord(await knowledgeRequest(`/kb.teach/detail?uuid=${encodeURIComponent(dialog.row.id)}`)) : {}
-      await knowledgeRequest(`/kb.teach/${dialog.row ? 'update' : 'insert'}`, { ...dialog.row ? { uuid: dialog.row.id } : { kb_id: Number(item.id), fd_id: Number(document?.id) }, question: dialogDraft.question, answer: dialogDraft.answer, files: original.files ?? [], images: original.images ?? [], video: original.video ?? [] })
-    }
-    if (dialog.kind === 'member') {
-      const page = loginRecord(await knowledgeRequest(`/kb.know/teamUsers?kb_id=${item.id}&keyword=${encodeURIComponent(dialogDraft.nickname ?? '')}&page_no=1&page_size=100`))
-      const users = knowledgeRows(page.lists ?? page.data)
-        .filter(user => knowledgeText(user.nickname) === dialogDraft.nickname || knowledgeText(user.sn) === dialogDraft.nickname)
-      if (users.length !== 1) throw new Error(t('kbMemberMatch'))
-      await knowledgeRequest('/kb.know/teamAdd', { kb_id: Number(item.id), users: { [knowledgeText(users[0]?.sn)]: dialogDraft.power === 'manage' ? 1 : dialogDraft.power === 'edit' ? 2 : 3 } })
+      await knowledgeRequest(`/kb.teach/${dialog.row ? 'update' : 'insert'}`, { ...dialog.row ? { uuid: dialog.row.id } : { kb_id: Number(item.id), fd_id: Number(document?.id) }, question: dialogDraft.question, answer: dialogDraft.answer, ...attachments })
     }
     if (dialog.kind === 'transfer') {
       const target = members.find(member => member.id === dialogDraft.member)
@@ -124,6 +153,17 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
       actions.setDetail('knowledge', null); actions.refreshKnowledge()
     }
     setDialog(null); refresh(); setNotice(r('saved'))
+  }) }
+  const uploadAttachments = (kind: 'images' | 'files' | 'video', files: File[]) => { void perform(async () => {
+    if ((kind === 'images' && (attachments.images.length + files.length > 9 || files.some(file => !file.type.startsWith('image/')))) ||
+        (kind === 'video' && (files.length !== 1 || files.some(file => !file.name.toLowerCase().endsWith('.mp4') || file.size > 20 * 1024 * 1024)))) throw new Error(t('knowledgeMediaInvalid'))
+    for (const file of files) {
+      const form = new FormData(); form.append('file', file)
+      const value = loginRecord(await knowledgeRequest(`/upload/${kind === 'images' ? 'image' : kind === 'files' ? 'file' : 'video'}`, form))
+      const attachment = { url: knowledgeText(value.uri ?? value.url), name: file.name }
+      if (!attachment.url) throw new Error(t('employeeWriteUnknown'))
+      setAttachments(current => ({ ...current, [kind]: kind === 'video' ? [attachment] : [...current[kind], attachment] }))
+    }
   }) }
   const saveSettings = () => { void perform(async () => {
     const baseChanged = ['name', 'intro', 'image', 'documents_model_id'].some(key => draft[key] !== savedDraft[key])
@@ -157,11 +197,11 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
         originals.current.set(file, objectId)
       }
       const preview = loginRecord(await knowledgeRequest('/kb.teach/importPreview', { kb_id: Number(item.id), method, object_id: objectId, segment_length: segmentLength }))
-      const rows = knowledgeRows(preview.rows)
+      const rows: Record<string, unknown>[] = knowledgeRows(preview.rows).map(row => ({ ...row, file_name: file.name }))
       imports.current.set(file, { kb_id: Number(item.id), method, documents: [{ request_id: randomUUID(), preview_key: preview.preview_key, name: file.name, path: '', object_id: objectId, data: rows.map(row => ({ q: row.q, a: row.a, location: row.location })) }] })
       prepared.push(...rows)
     }
-    setPreviews(prepared)
+    setPreviews(prepared); setPreviewFile(files[0]?.name ?? '')
   }) }
   const importData = () => { void perform(async () => {
     const method = importType === 'qaSplit' ? 2 : importType === 'qaImport' ? 3 : importType === 'webImport' ? 4 : 1
@@ -169,7 +209,8 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
     const capabilities = loginRecord(await knowledgeRequest('/kb.teach/importCapabilities'))
     const capability = loginRecord(loginRecord(capabilities.methods)[knowledgeText(method)])
     if (method === 4) {
-      await knowledgeRequest('/kb.teach/import', { kb_id: Number(item.id), method, documents: [{ name: urls, path: '', data: [{ q: content, a: '' }] }] })
+      if (capability.mode === 'unavailable' || !webPages.length) throw new Error(t('knowledgeImportUnavailable'))
+      await knowledgeRequest('/kb.teach/import', { kb_id: Number(item.id), method, documents: webPages.filter(page => page.content.trim()).map(page => ({ name: page.name, path: page.name, data: [{ q: page.content, a: '' }] })) })
     } else {
       if (method === 1 ? capability.mode !== 'server' : capability.supports_server_preview !== true) throw new Error(t('kbParserRequired'))
       if (!files.length || (versionTarget && files.length !== 1)) throw new Error(t('parseOneVersion'))
@@ -217,23 +258,42 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
     {notice && <p className={css.notice} role="status">{notice}</p>}
     {section === 'dataStudy' && <>
       {mode === 'documents' ? <>
-        <div className={css.toolbar}><div className={css.inline}><Button variant="primary" disabled={busy || !editable} onClick={() =>{  setVersionTarget(null); setFiles([]); imports.current.clear(); setMode('import') }}>{r('importData')}</Button><Button aria-label={r('refresh')} onClick={() => { setQuery(''); setSearch(''); refresh() }}><IconRefreshOutlineRegular size={18} /></Button></div><div className={css.inline}><Input aria-label={r('keyword')} placeholder={r('keyword')} value={query} onChange={(event) =>{  setQuery(event.target.value) }} onKeyDown={(event) => { if (event.key === 'Enter') setSearch(query) }} /><Button variant="primary" onClick={() =>{  setSearch(query) }}>{r('query')}</Button><Button onClick={() => { setQuery(''); setSearch('') }}>{r('reset')}</Button></div></div>
-        <ResourceTable rows={filteredDocuments} r={r} columns={[['name', 'name'], ['parseState', 'parseStatus'], ['waiting', 'waiting'], ['trained', 'trained'], ['totalData', 'totalData'], ['createdAt', 'createdAt']]} onOpen={openDocument}
+        <div className={css.toolbar}><div className={css.inline}><Button variant="primary" disabled={busy || !editable} onClick={() =>{  setVersionTarget(null); setFiles([]); setPreviews([]); setWebPages([]); imports.current.clear(); setMode('import') }}>{r('importData')}</Button><Button aria-label={r('refresh')} onClick={() => { setQuery(''); setSearch(''); refresh() }}><IconRefreshOutlineRegular size={18} /></Button></div><div className={css.inline}><Input aria-label={r('keyword')} placeholder={r('keyword')} value={query} onChange={(event) =>{  setQuery(event.target.value) }} onKeyDown={(event) => { if (event.key === 'Enter') setSearch(query) }} /><Button variant="primary" onClick={() =>{  setSearch(query) }}>{r('query')}</Button><Button onClick={() => { setQuery(''); setSearch('') }}>{r('reset')}</Button></div></div>
+        <ResourceTable paginate loading={!documentsResource.value && documentsResource.status !== 'failed'} rows={filteredDocuments} r={r} columns={[['name', 'name'], ['waiting', 'waiting'], ['trained', 'trained'], ['totalData', 'totalData'], ['createdAt', 'createdAt']]} onOpen={openDocument}
           actions={row => [
             { label: 'fileAccess' as const, run: () => { setAccessFile(row) } },
             ...row.hasParse === '1' ? [{ label: 'parseStatus' as const, run: () => { setParseFile(row) } }] : [],
             ...owned && row.is_default !== '1' ? [{ label: 'uploadVersion' as const, run: () => { setMode('import'); setImportType('docImport'); setFiles([]); imports.current.clear(); setVersionTarget(row) } }] : [],
             { label: 'rename', disabled: !owned, run: () =>{  show('rename', row) } },
-            ...owned ? [{ label: 'filePermissions' as const, run: () =>{  show('acl', row) } }] : [],
+            ...manageable ? [{ label: 'filePermissions' as const, run: () =>{  show('acl', row) } }] : [],
             ...owned && row.is_default !== '1' ? [{ label: 'delete' as const, run: () =>{  setConfirmation({ key: documentsKey, ids: [row.id] }) } }] : [],
           ]} />
       </> : mode === 'import' ? <>
         <Button disabled={busy} onClick={() =>{  setMode('documents') }}><IconChevronLeftOutlineRegular size={16} />{r('fileImport')}</Button>
         {versionTarget && <p>{r('uploadVersion')}: {versionTarget.name} · {versionTarget.version}</p>}
         <div className={css.importTabs}>{(['docImport', 'qaImport', 'qaSplit', 'webImport'] as const).map(type => <button type="button" key={type} disabled={busy || Boolean(versionTarget && type !== 'docImport')} aria-pressed={importType === type} onClick={() => { setImportType(type); setFiles([]); setPreviews([]); imports.current.clear(); originals.current.clear() }}>{r(type)}<small>{r(`${type}Desc`)}</small></button>)}</div>
-        {importType === 'webImport' ? <><textarea className={css.textArea} rows={5} aria-label={r('webUrls')} placeholder={r('webUrls')} value={urls} onChange={(event) =>{  setUrls(event.target.value) }} /><Button onClick={() => { void perform(async () => { const captured = knowledgeRows(await knowledgeRequest('/kb.teach/capture', { url: urls.split('\n').filter(Boolean) })); setContent(captured.map(row => knowledgeText(row.content)).join('\n\n')) }) }}>{r('parse')}</Button><textarea className={css.textArea} rows={8} aria-label={r('fileContent')} placeholder={r('fileContent')} value={content} onChange={(event) =>{  setContent(event.target.value) }} /></>
-          : <><div className={css.dropZone}><span>{r('dropFile')}</span><Button>{r('chooseFile')}</Button><input type="file" multiple={!versionTarget} disabled={busy} aria-label={r('chooseFile')} accept={importType === 'qaImport' ? '.csv,.xlsx' : importType === 'qaSplit' ? '.pdf,.docx,.txt,.md' : '.pdf,.docx,.txt,.md,.xlsx,.pptx'} onChange={(event) =>{  imports.current.clear(); originals.current.clear(); setPreviews([]); setFiles(Array.from(event.target.files ?? [])) }} /></div>{files.map(file => <div className={css.result} key={`${file.name}:${file.lastModified}`}>{file.name}</div>)}{importType === 'qaImport' && <Button onClick={exportRows}>{r('downloadTemplate')}</Button>}{importType !== 'docImport' && <div className={css.inline}>{importType === 'qaSplit' && <label>{r('segmentLength')} <input type="number" value={segmentLength} min={100} max={10000} onChange={(event) => { setSegmentLength(Number(event.target.value)); imports.current.clear(); setPreviews([]) }} /></label>}<Button disabled={busy || files.length === 0} onClick={previewImport}>{r('repreview')}</Button></div>}{previews.length > 0 && <label>{t('importPreviewHint')}<textarea className={css.textArea} rows={12} readOnly value={previews.map(row => `${knowledgeText(row.q)}\n${knowledgeText(row.a)}`).join('\n\n')} /></label>}{content && <p className={css.result}>{content}</p>}</>}
-        <div className={css.formFooter}><Button variant="primary" disabled={busy || !editable || (importType === 'webImport' ? !content : files.length === 0 || (importType !== 'docImport' && previews.length === 0))} onClick={importData}>{r('save')}</Button></div>
+        <p className={css.notice} role="status">{capabilitiesResource.status === 'loading' ? t('knowledgeImportLoading') : capabilitiesResource.status === 'failed' ? capabilitiesResource.failure?.message : `${t('knowledgeImportMode')}：${importOptions.mode}`}{(!importOptions.available || capabilitiesResource.status === 'failed') && <Button onClick={refresh}>{r('refresh')}</Button>}</p>
+        {importType === 'webImport' ? <>
+          <textarea className={css.textArea} rows={6} disabled={busy} aria-label={r('webUrls')} placeholder={r('webUrls')} value={urls} onChange={(event) => { setUrls(event.target.value) }} />
+          <Button variant="primary" disabled={busy || !importOptions.available || !urls.trim()} onClick={() => { void perform(async () => {
+            const captured = knowledgeRows(await knowledgeRequest('/kb.teach/capture', { url: urls.split('\n').filter(Boolean) }))
+            setWebPages(captured.map(row => ({ name: knowledgeText(row.url ?? row.name), content: knowledgeText(row.content) })))
+          }) }}>{r('parse')}</Button>
+          {webPages.map((page, index) => <div className={css.result} key={page.name}><div className={css.toolbar}><strong>{page.name}</strong><Button disabled={busy} aria-label={`${r('delete')} · ${page.name}`} onClick={() => { setWebPages(current => current.filter((_, i) => i !== index)) }}>{r('delete')}</Button></div><textarea className={css.textArea} rows={10} disabled={busy} aria-label={`${r('fileContent')} · ${page.name}`} value={page.content} onChange={(event) => { const content = event.target.value; setWebPages(current => current.map((value, i) => i === index ? { ...value, content } : value)) }} /></div>)}
+        </> : <>
+          <div className={css.dropZone} onDragOver={(event) => { event.preventDefault() }}
+            onDrop={(event) => { event.preventDefault(); selectFiles(Array.from(event.dataTransfer.files)) }}>
+            <span>{r('dropFile')}</span><span className={css.link}>{r('chooseFile')}</span>
+            <input type="file" multiple={!versionTarget} disabled={busy || !importOptions.available} aria-label={r('chooseFile')} accept={importOptions.extensions.join(',')} onChange={(event) => { selectFiles(Array.from(event.target.files ?? [])); event.target.value = '' }} />
+            <small>{t('knowledgeSupportedFiles')}：{importOptions.extensions.join(', ') || '—'}</small>
+          </div>
+          {importType === 'docImport' && <p className={css.notice}>{importOptions.available ? <>{t('knowledgeImportServer')} {t('knowledgeOcr')}：{t(capabilities.ocr_enabled === true ? 'knowledgeEnabled' : 'knowledgeDisabled')}</> : t('knowledgeImportUnavailable')}</p>}
+          {importType === 'qaImport' && <Button onClick={exportRows}>{r('downloadTemplate')}</Button>}
+          <div className={css.importFiles}>{files.map(file => <div key={`${file.name}:${file.lastModified}`}><Button onClick={() => { setPreviewFile(file.name) }}>{file.name}</Button><Button disabled={busy} aria-label={`${r('delete')} · ${file.name}`} onClick={() => { imports.current.delete(file); originals.current.delete(file); setFiles(current => current.filter(value => value !== file)); setPreviews(current => current.filter(row => row.file_name !== file.name)); if (previewFile === file.name) setPreviewFile('') }}>{r('delete')}</Button></div>)}</div>
+          {importType !== 'docImport' && <div className={css.inline}>{importType === 'qaSplit' && <label>{r('segmentLength')} <input type="number" disabled={busy} value={segmentLength} min={100} max={10000} onChange={(event) => { setSegmentLength(Number(event.target.value)); imports.current.clear(); setPreviews([]) }} /></label>}<Button disabled={busy || !importOptions.available || files.length === 0} onClick={previewImport}>{r('repreview')}</Button></div>}
+          {previews.length > 0 && <div className={css.result}><h3>{t('knowledgePreview')} · {previewFile}</h3>{previews.filter(row => row.file_name === previewFile).map((row, index) => <div key={index} className={css.result}><p>{knowledgeText(row.q)}</p><p>{knowledgeText(row.a)}</p></div>)}</div>}
+        </>}
+        <div className={css.importFooter}><Button variant="primary" disabled={busy || !editable || !importOptions.available || (importType === 'webImport' ? !webPages.some(page => page.content.trim()) : files.length === 0 || (importType !== 'docImport' && previews.length === 0))} onClick={importData}>{r('save')}</Button></div>
       </> : <>
         <Button onClick={() => { setMode('documents'); setSearch(''); setQuery('') }}><IconChevronLeftOutlineRegular size={16} />{document?.name}</Button>
         <Button disabled={busy} onClick={refresh}>{t('parseRefresh')}</Button>
@@ -244,27 +304,33 @@ function KnowledgeContent(props: KnowledgeDetailProps & { detail: Record<string,
         </p>)}
         <div className={css.toolbar}><div className={css.inline}><Button variant="primary" disabled={busy || !editable} onClick={() =>{  show('fragment') }}>{r('entryData')}</Button><Button disabled={busy || !editable} onClick={exportRows}>{r('exportAll')}</Button><Button disabled={busy || selection.length === 0 || selection.some(id => fragments.find(row => row.id === id)?.can_retry !== '1')} onClick={() =>{  retry(selection) }}>{r('batchRetry')}</Button><Button disabled={busy || selection.length === 0 || selection.some(id => fragments.find(row => row.id === id)?.can_delete !== '1')} onClick={() =>{  setConfirmation({ key: fragmentsKey, ids: selection }) }}>{r('batchDelete')}</Button></div>
           <div className={css.inline}><Input value={query} aria-label={r('keyword')} placeholder={r('keyword')} onChange={(event) => { setQuery(event.target.value); setSearch(event.target.value) }} /><select value={status} onChange={(event) =>{  setStatus(event.target.value) }} aria-label={r('learningStatus')}>{(['all', 'waitingLearn', 'learning', 'failedLearn', 'learned'] as const).map(value => <option key={value} value={value}>{r(value)}</option>)}</select></div></div>
-        <ResourceTable rows={filteredFragments} r={r} selection={selection} onSelection={setSelection} columns={[['question', 'documentContent'], ['answer', 'extraContent'], ['status', 'learningStatus'], ['consumed', 'consumed'], ['updatedAt', 'updatedAt']]} cell={(row, key) => key === 'status' ? r(row.status === 'learned' ? 'learned' : row.status === 'failedLearn' ? 'failedLearn' : row.status === 'learning' ? 'learning' : 'waitingLearn') : row[key] ?? '—'} actions={row => [
+        <ResourceTable paginate loading={!fragmentsResource.value && fragmentsResource.status !== 'failed'} rows={filteredFragments} r={r} selection={selection} onSelection={setSelection} columns={[['question', 'documentContent'], ['answer', 'extraContent'], ['status', 'learningStatus'], ['consumed', 'consumed'], ['updatedAt', 'updatedAt']]} cell={(row, key) => key === 'status' ? r(row.status === 'learned' ? 'learned' : row.status === 'failedLearn' ? 'failedLearn' : row.status === 'learning' ? 'learning' : 'waitingLearn') : row[key] ?? '—'} actions={row => [
           { label: 'correct', disabled: row.can_edit !== '1', run: () =>{  show('fragment', row) } }, ...row.status === 'failedLearn' ? [{ label: 'retry' as const, disabled: row.can_retry !== '1', run: () =>{  retry([row.id]) } }] : [], { label: 'delete', disabled: row.can_delete !== '1', run: () =>{  setConfirmation({ key: fragmentsKey, ids: [row.id] }) } },
         ]} />
       </>}
     </>}
-    {section === 'testData' && <div className={css.columns}><div><label>{r('testText')}<textarea className={css.textArea} rows={20} value={question} onChange={(event) =>{  setQuestion(event.target.value) }} /></label><div className={css.toolbar}><Button variant="primary" disabled={!question.trim()} onClick={() => { void perform(async () => { setTested(false); setHits([]); setHits(knowledgeRows(await knowledgeRequest('/kb.teach/tests', { ...knowledgeSearchInput(draft), question, kb_id: Number(item.id) }))); setTested(true) }) }}>{r('test')}</Button><Button onClick={() =>{  show('parameters') }}>{r('searchParameters')}</Button></div></div><div>{tested ? <><h2>{r('results')}</h2>{hits.length === 0 && <p>{r('empty')}</p>}{hits.map((hit, index) => <div key={`${index}:${knowledgeText(hit.question)}`} className={css.result}><strong>{knowledgeText(hit.question ?? '')}</strong><p>{knowledgeText(hit.answer ?? '')}</p><p>{sourceCitation(hit, { page: t('sourcePage'), slide: t('sourceSlide'), sheet: t('sourceSheet'), cells: t('sourceCells'), paragraph: t('sourceParagraph'), missing: t('sourceMissing') })}</p><span>{r('score')}：{knowledgeText(hit.score ?? hit.full_score ?? hit.emb_score ?? '')}</span></div>)}</> : <p className={css.empty}>{r('testResult')}</p>}</div></div>}
-    {section === 'teamData' && <><h2>{r('myTeam')}</h2><div className={css.toolbar}><span>{r('teamMembers')} ({members.length})</span>{owned && <Button variant="outline" onClick={() =>{  show('member') }}>+ {r('addMember')}</Button>}</div>
-      <ResourceTable rows={members} r={r} columns={[['nickname', 'memberInfo'], ['role', 'memberRole'], ['power', 'defaultPermission']]} cell={(row, key) => key === 'role' ? r(row.role === 'owner' ? 'owner' : 'member') : key === 'power' ? r(row.power === 'all' ? 'allPermission' : row.power === 'edit' ? 'editPermission' : row.power === 'manage' ? 'managePermission' : 'viewPermission') : row[key] ?? '—'} actions={row => row.role === 'owner' ? [] : owned ? [
+    {section === 'testData' && <div className={`${css.columns} ${css.searchColumns}`}><div><label className={css.searchField}><span>{r('testText')}</span><textarea className={css.textArea} rows={20} value={question} onChange={(event) =>{  setQuestion(event.target.value) }} /></label><div className={`${css.toolbar} ${css.searchButtons}`}><Button variant="primary" disabled={busy || !question.trim()} onClick={() => { void perform(async () => { setTested(false); setHits([]); setHits(knowledgeRows(await knowledgeRequest('/kb.teach/tests', { ...knowledgeSearchInput(draft), question, kb_id: Number(item.id) }))); setTested(true) }) }}>{r('test')}</Button><Button onClick={() =>{  show('parameters') }}>{t(draft.search_mode === 'full' ? 'pc35' : draft.search_mode === 'mix' ? 'pc36' : 'pc34')}</Button></div></div><div>{tested ? <><h2>{r('results')}</h2>{hits.length === 0 && <p>{r('empty')}</p>}{hits.map((hit, index) => <div key={`${index}:${knowledgeText(hit.question)}`} className={css.result}><strong>{knowledgeText(hit.question ?? '')}</strong><p>{knowledgeText(hit.answer ?? '')}</p><p>{sourceCitation(hit, { page: t('sourcePage'), slide: t('sourceSlide'), sheet: t('sourceSheet'), cells: t('sourceCells'), paragraph: t('sourceParagraph'), missing: t('sourceMissing') })}</p><span>{r('score')}：{knowledgeText(hit.score ?? hit.full_score ?? hit.emb_score ?? '')}</span></div>)}</> : <div className={css.searchEmpty}>{r('testResult')}</div>}</div></div>}
+    {section === 'teamData' && <><h2>{r('myTeam')}</h2><div className={css.toolbar}><span>{r('teamMembers')} ({membersResource.value ? members.length : '—'})</span>{owned && <Button variant="outline" onClick={() =>{  show('member') }}>+ {r('addMember')}</Button>}</div>
+      <ResourceTable paginate loading={!membersResource.value && membersResource.status !== 'failed'} rows={members} r={r} columns={[['nickname', 'memberInfo'], ['role', 'memberRole'], ['power', 'defaultPermission'], ['createdAt', 'joinedAt']]} cell={(row, key) => key === 'nickname' ? <span className={css.memberIdentity}>{row.avatar ? <img className={css.memberAvatar} src={row.avatar} alt="" /> : <IconUsersOutlineRegular size={28} />}<span>{row.nickname}</span>{row.sn === membersResource.value?.currentSn && <Tag>{t('knowledgeMe')}</Tag>}</span> : key === 'role' ? r(row.role === 'owner' ? 'owner' : 'member') : key === 'power' ? r(row.power === 'all' ? 'allPermission' : row.power === 'edit' ? 'editPermission' : row.power === 'manage' ? 'managePermission' : 'viewPermission') : row[key] ?? '—'} actions={row => row.role === 'owner' ? [] : owned ? [
         { label: 'editPermission', run: () =>{  memberPower(row.id, 2) } }, { label: 'viewPermission', run: () =>{  memberPower(row.id, 3) } }, { label: 'managePermission', run: () =>{  memberPower(row.id, 1) } }, { label: 'removeMember', run: () =>{  setConfirmation({ key: membersKey, ids: [row.id] }) } },
-      ] : []} />{owned && <Button onClick={() =>{  show('transfer') }}>{r('transfer')}</Button>}</>}
-    {section === 'setUp' && <><h2>{r('knowledgeSettings')}</h2><div className={css.tabs}><Button aria-pressed>{r('baseInfo')}</Button></div><ResourceFields t={t} form="knowledgeSettings" draft={draft} options={modelOptions} onChange={update} knowledge={knowledge} editing disabled={busy || !editable} /><p className={css.notice}>{r('enabledExternalHint')}</p><div className={css.formFooter}><Button variant="primary" disabled={busy || !editable} onClick={() => { if (Number(draft.external_enabled) === 1 && Number(savedDraft.external_enabled ?? 0) !== 1) setExternalConfirm(true); else saveSettings() }}>{r('saveSettings')}</Button><Button disabled={busy || !editable} onClick={onDelete}>{r('delete')}</Button></div></>}
+      ] : []} />{owned && members.some(member => member.role !== 'owner') && <Button onClick={() =>{ show('transfer') }}>{r('transfer')}</Button>}</>}
+    {section === 'setUp' && <><h2>{r('knowledgeSettings')}</h2><div className={css.tabs}><Button aria-pressed>{r('baseInfo')}</Button></div><ResourceFields t={t} form="knowledgeSettings" draft={draft} options={modelOptions} onChange={update} knowledge={knowledge} editing disabled={busy || !manageable} /><div className={css.formFooter}><Button variant="primary" disabled={busy || !manageable} onClick={() => { if (Number(draft.external_enabled) === 1 && Number(savedDraft.external_enabled ?? 0) !== 1) setExternalConfirm(true); else saveSettings() }}>{r('saveSettings')}</Button><Button disabled={busy || !owned} onClick={onDelete}>{r('delete')}</Button></div></>}
+    {dialog?.kind === 'member' && <KnowledgeMembers {...props} kb={item.id} onClose={() => { setDialog(null) }} onSaved={refresh} />}
     {dialog?.kind === 'acl' && dialog.row && <KnowledgeAcl {...props} fd={dialog.row.id} onClose={() => { setDialog(null) }} />}
-    <Modal open={externalConfirm} onClose={() => { setExternalConfirm(false) }} title={t('aclExternalConfirm')} closeLabel={r('close')} footer={<><Button disabled={busy} onClick={() => { setExternalConfirm(false) }}>{r('cancel')}</Button><Button disabled={busy} onClick={saveSettings}>{r('confirm')}</Button></>}>{notice && <p role="alert">{notice}</p>}</Modal>
-    <Modal open={dialog !== null && dialog.kind !== 'acl'} onClose={() =>{  setDialog(null) }} closeLabel={r('close')} title={r(dialogTitle)} className={css.dialog as string}
-      footer={<><Button variant="outline" onClick={() =>{  setDialog(null) }}>{r('cancel')}</Button><Button variant="primary" disabled={busy || dialog?.kind === 'acl'} onClick={saveDialog}>{r('confirm')}</Button></>}>
+    <Modal open={externalConfirm} onClose={() => { setExternalConfirm(false) }} title={t('aclExternalConfirm')} closeLabel={r('close')} className={css.knowledgeTheme as string} footer={<><Button disabled={busy} onClick={() => { setExternalConfirm(false) }}>{r('cancel')}</Button><Button disabled={busy} onClick={saveSettings}>{r('confirm')}</Button></>}>{notice && <p role="alert">{notice}</p>}</Modal>
+    <Modal open={dialog !== null && dialog.kind !== 'acl' && dialog.kind !== 'member'} onClose={() =>{ if (!busy) setDialog(null) }} closeLabel={r('close')} title={r(dialogTitle)} className={`${dialog?.kind === 'fragment' ? css.fragmentDialog : css.dialog} ${css.knowledgeTheme}`}
+      footer={<><Button variant="outline" disabled={busy} onClick={() =>{ setDialog(null) }}>{r('cancel')}</Button><Button variant="primary" disabled={busy || dialog?.kind === 'acl' || (dialog?.kind === 'fragment' && !dialogDraft.question?.trim())} onClick={saveDialog}>{r('confirm')}</Button></>}>
       {notice && <p role="alert">{notice}</p>}
       {dialog?.kind === 'fragment' && <><Button disabled={busy || !dialogDraft.question?.trim()} onClick={() => { void perform(async () => { const value = loginRecord(await knowledgeRequest('/kb.teach/charging', { kb_id: Number(item.id), text: `${dialogDraft.question ?? ''}\n${dialogDraft.answer ?? ''}` })); setEstimate(knowledgeText(value.tokens)) }) }}>{t('learningEstimate')}</Button>{estimate && <p role="status">{t('learningEstimateHint')}: {estimate}</p>}</>}
       {dialog?.kind === 'rename' ? <label>{r('name')}<Input value={dialogDraft.name ?? ''} onChange={(event) =>{  setDialogDraft(current => ({ ...current, name: event.target.value })) }} /></label>
         : dialog?.kind === 'transfer' ? <><p>{r('transferConfirm')}</p><select aria-label={r('memberInfo')} value={dialogDraft.member ?? ''} onChange={(event) =>{  setDialogDraft(current => ({ ...current, member: event.target.value })) }}><option value="">—</option>{members.filter(member => member.role !== 'owner').map(member => <option key={member.id} value={member.id}>{member.nickname}</option>)}</select></>
-          : <ResourceFields t={t} form={dialogForm} draft={dialogDraft} knowledge={knowledge} options={dialog?.kind === 'parameters' ? { ...modelOptions, optimize_m_id: modelOptions.documents_model_id ?? [] } : {}}
+          : <ResourceFields t={t} form={dialogForm} disabled={busy} draft={dialogDraft} knowledge={knowledge} options={dialog?.kind === 'parameters' ? { ...modelOptions, optimize_m_id: modelOptions.documents_model_id ?? [] } : {}}
             onChange={(key, value) =>{  setDialogDraft(current => ({ ...current, [key]: value })) }} />}
+      {dialog?.kind === 'fragment' && <div className={css.attachmentFields}>
+        {(['images', 'video', 'files'] as const).map(kind => <div key={kind}><label className={css.attachmentPicker}>{t(kind === 'images' ? 'knowledgeImages' : kind === 'video' ? 'knowledgeVideo' : 'knowledgeAttachments')}<input type="file" disabled={busy} multiple={kind !== 'video'} accept={kind === 'images' ? 'image/*' : kind === 'video' ? '.mp4' : undefined} onChange={(event) => { uploadAttachments(kind, Array.from(event.target.files ?? [])); event.target.value = '' }} /></label>
+          {attachments[kind].map((value, index) => <div className={css.inline} key={`${knowledgeText(value.url)}:${index}`}><span>{knowledgeText(value.name) || knowledgeText(value.url)}</span><Button disabled={busy} aria-label={`${r('delete')} · ${knowledgeText(value.name)}`} onClick={() => { setAttachments(current => ({ ...current, [kind]: current[kind].filter((_, i) => i !== index) })) }}>{r('delete')}</Button></div>)}
+        </div>)}<small>{t('knowledgeMediaHint')}</small>
+      </div>}
     </Modal>
     <Modal open={confirmation !== null} onClose={() =>{  setConfirmation(null) }} closeLabel={r('close')} title={r('deleteConfirm')} description={r('deleteHint')}
       footer={<><Button variant="outline" onClick={() =>{  setConfirmation(null) }}>{r('cancel')}</Button><Button variant="primary" disabled={busy} onClick={remove}>{r('confirmDelete')}</Button></>} />

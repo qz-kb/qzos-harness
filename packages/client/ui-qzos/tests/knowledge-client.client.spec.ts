@@ -1,6 +1,8 @@
 /** Real transport behavior without contacting external providers. */
 import { afterEach, expect, it, vi } from 'vitest'
-import { readConnections, knowledgeSearchInput, knowledgeRequest, knowledgePages, knowledgeTable, saveKnowledge } from '../src/client/knowledge-client.ts'
+import { Context } from '@deepseek-ai/cordis'
+import { ResourceRegistry } from '../../resources/src/client/resources.ts'
+import { installKnowledgeResources, readConnections, knowledgeSearchInput, knowledgeRequest, knowledgePages, knowledgeTable, saveKnowledge, knowledgeLearningPending } from '../src/client/knowledge-client.ts'
 import { loginApi, loginSessionKey } from '../src/client/login-client.ts'
 
 function setup() {
@@ -67,4 +69,79 @@ it('keeps authorized connections and history when the market is disabled, but pr
     .mockResolvedValueOnce(new Response(JSON.stringify({ code: -1, msg: 'expired' })))
     .mockResolvedValueOnce(reply([]))
   await expect(readConnections(new AbortController().signal)).rejects.toThrow('expired')
+})
+
+it.each(['knowledge', 'employees'])('retains %s cards and coalesces refreshes during a pending read', async (panel) => {
+  const { fetcher, values } = setup()
+  fetcher.mockResolvedValue(reply({ lists: [{ id: 1, name: 'first' }], count: 1 }))
+  const ctx = new Context()
+  const registry = new ResourceRegistry(ctx)
+  ctx.reflect.provide('resources', registry)
+  let refresh!: (panel: string) => void
+  const fiber = ctx.plugin({ apply: (child: Context) => { refresh = installKnowledgeResources(child) } })
+  await fiber.await()
+  const account = new AbortController()
+  const kind = panel === 'knowledge' ? 'list' : 'employees'
+  const address = `dsh-resource://qzos-knowledge/${kind}?epoch=1&revision=0`
+  const source = registry.source(address)
+  try {
+    registry.pin(address, account.signal)
+    let off = source.subscribe(() => {})
+    await vi.waitFor(() => { expect(source.getSnapshot().status).toBe('live') })
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain(panel === 'knowledge' ? '/kb.know/lists' : '/kb.robot/lists')
+    off(); off = source.subscribe(() => {})
+    expect(source.getSnapshot().value).toEqual({ rows: [{ id: 1, name: 'first' }] })
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    let finish: ((value: Response) => void) | undefined
+    fetcher.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+    refresh(panel)
+    await vi.waitFor(() => { expect(finish).toBeDefined() })
+    expect(source.getSnapshot()).toMatchObject({ status: 'live', value: { rows: [{ id: 1 }] } })
+    fetcher.mockResolvedValueOnce(reply({ lists: [{ id: 2, name: 'updated' }], count: 1 }))
+    refresh(panel); refresh(panel)
+    expect(fetcher).toHaveBeenCalledTimes(2)
+    finish!(reply({ lists: [{ id: 1, name: 'first' }], count: 1 }))
+    await vi.waitFor(() => { expect(source.getSnapshot().value).toEqual({ rows: [{ id: 2, name: 'updated' }] }) })
+    expect(fetcher).toHaveBeenCalledTimes(3)
+    fetcher.mockResolvedValueOnce(new Response(JSON.stringify({ code: 0, msg: 'offline' })))
+    refresh(panel)
+    await vi.waitFor(() => { expect(source.getSnapshot().status).toBe('failed') })
+    expect(source.getSnapshot().value).toEqual({ rows: [{ id: 2, name: 'updated' }] })
+    fetcher.mockResolvedValueOnce(new Response(JSON.stringify({ code: -1, msg: 'expired' })))
+    refresh(panel)
+    await vi.waitFor(() => { expect(source.getSnapshot().value).toEqual({ rows: [] }) })
+    off(); account.abort(); values.clear()
+    expect(source.getSnapshot().value).toBeUndefined()
+    refresh(panel)
+    expect(fetcher).toHaveBeenCalledTimes(5)
+    const next = registry.source(`dsh-resource://qzos-knowledge/${kind}?epoch=2&revision=0`)
+    expect(next.getSnapshot().value).toBeUndefined()
+  } finally { account.abort(); await fiber.dispose() }
+})
+
+it('refreshes legacy queued rows as well as staged incremental learning', () => {
+  expect(knowledgeLearningPending({ rows: [{ status: 1 }], learning: { pending: false } })).toBe(true)
+  expect(knowledgeLearningPending({ rows: [], learning: { pending: true } })).toBe(true)
+  expect(knowledgeLearningPending({ rows: [], qa: { lists: [{ status: 0 }] } })).toBe(true)
+  expect(knowledgeLearningPending({ rows: [{ status: 2 }, { status: 3 }], learning: { pending: false } })).toBe(false)
+})
+
+it('keeps authorized QZOS counters when the optional DSH usage endpoint is unavailable', async () => {
+  const { fetcher } = setup()
+  fetcher.mockImplementation(async url => String(url).includes('/kb.dsh/summary')
+    ? new Response('', { status: 404 }) : reply({ robot: { todayChatCount: 2 }, visitor: { wholeVisitorCount: 1 } }))
+  const ctx = new Context(), registry = new ResourceRegistry(ctx)
+  ctx.reflect.provide('resources', registry)
+  const fiber = ctx.plugin({ apply: (child: Context) => { installKnowledgeResources(child) } })
+  await fiber.await()
+  const stats = registry.source('dsh-resource://qzos-knowledge/employee-stats?id=7')
+  const usage = registry.source('dsh-resource://qzos-knowledge/employee-usage?id=7')
+  const offStats = stats.subscribe(() => {}), offUsage = usage.subscribe(() => {})
+  try {
+    await vi.waitFor(() => { expect(usage.getSnapshot().status).toBe('failed') })
+    expect(stats.getSnapshot()).toMatchObject({ status: 'live', value: { robot: { todayChatCount: 2 } } })
+    expect(fetcher).toHaveBeenCalledTimes(2)
+    expect(fetcher.mock.calls.every(([, init]) => (init?.headers as { token: string }).token === 'business-test')).toBe(true)
+  } finally { offStats(); offUsage(); await fiber.dispose() }
 })

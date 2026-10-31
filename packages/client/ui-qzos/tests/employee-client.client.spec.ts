@@ -88,3 +88,15 @@ it.each([
 ])('keeps ordinary text or unsupported historical normalization: $ask', (record) => {
   expect(employeeCorrectionQuestion(record, 'Research team')).toBe(record.ask)
 })
+
+it('uploads new menu images while preserving existing URLs and the work-window execution flag', async () => {
+  const fetcher = await setupSave()
+  fetcher.mockResolvedValueOnce(new Response(new Blob(['synthetic image'], { type: 'image/png' })))
+    .mockResolvedValueOnce(reply({ uri: '/new-menu.png' }))
+    .mockResolvedValueOnce(reply(null)).mockResolvedValueOnce(reply(original))
+  await saveEmployee(original, employeeDraft(original), [{ keyword: 'help', content: 'reply', images: ['/existing.png', 'data:image/png;base64,eA=='] }], new AbortController().signal)
+  const edit = fetcher.mock.calls.find(([url]) => String(url).includes('/kb.robot/edit'))
+  const body = JSON.parse(String(edit?.[1]?.body))
+  expect(body).toMatchObject({ use_work_window_model: 1, model_id: 2, model_sub_id: 3, menus: [{ keyword: 'help', images: ['/existing.png', '/new-menu.png'] }] })
+  expect(fetcher.mock.calls.filter(([url]) => String(url).includes('/upload/image'))).toHaveLength(1)
+})
