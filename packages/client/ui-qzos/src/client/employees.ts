@@ -114,7 +114,8 @@ export function installEmployeeMentions(ctx: Context, t: Translate): ((id: strin
         if (!token) return Promise.reject(new Error(t('unavailable')))
         return employeeHost({ action: 'bind', token, sessionId, employeeId: id }, signal).then(() => {
           if (storedLogin(sessionStorage) !== token) throw new Error(t('unavailable'))
-          return decode(ref).label
+          // The leading reference routes this Session; it is not part of the knowledge question.
+          return ''
         })
       },
     },

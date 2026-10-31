@@ -1,5 +1,5 @@
 /** QZOS employee configuration adapter; business identity stays in the shared transport. */
-import { knowledgeDraft, knowledgeText, knowledgeRequest } from './knowledge-client.ts'
+import { knowledgeDraft, knowledgeText, knowledgeRows, knowledgeRequest } from './knowledge-client.ts'
 import { loginApi, loginRecord, storedLogin, type LoginRecord } from './login-client.ts'
 import type { Example } from './catalog.ts'
 import type { PreviewValues } from './resource-schema.ts'
@@ -10,6 +10,20 @@ import type { PreviewValues } from './resource-schema.ts'
  */
 export function employeeCard(row: LoginRecord): Example {
   return { id: knowledgeText(row.id), title: knowledgeText(row.name), description: knowledgeText(row.intro), category: '', content: '', scope: Number(row.is_public) === 1 ? 'public' : 'private', status: Number(row.is_enable) === 1 ? 'ready' : 'pending', values: knowledgeDraft(row) }
+}
+/** Prefill a legacy employee correction only when its label and quoted question agree.
+ * @param record - Original conversation record, including its captured knowledge quotes.
+ * @param employeeName - Current employee name used by the native reference label.
+ * @returns Source question for an exact legacy prefix, otherwise the unchanged historical question.
+ */
+export function employeeCorrectionQuestion(record: LoginRecord, employeeName: string): string {
+  const original = knowledgeText(record.ask)
+  const prefix = `@${employeeName}`
+  if (!employeeName || !original.startsWith(prefix) || !/^\s/u.test(original.slice(prefix.length))
+    || !Array.isArray(record.quotes)) return original
+  const question = original.slice(prefix.length).trim()
+  const sources = knowledgeRows(record.quotes).map(source => knowledgeText(source.question))
+  return question && !sources.includes(original) && sources.includes(question) ? question : original
 }
 /** Keep nested configuration intact while exposing existing string fields.
  * @param row - Full employee configuration.

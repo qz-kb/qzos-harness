@@ -67,7 +67,8 @@ it('captures the submitted task before the native editor clears it and excludes 
   runtime.fetcher.mockResolvedValueOnce(new Response(JSON.stringify({ ok: true })))
   const pending = runtime.source().codec?.serialize(runtime.reference(), new AbortController().signal)
   runtime.replaceDraft()
-  expect(await pending).toBe('@Researcher')
+  expect(await pending).toBe('')
+  expect(runtime.source().codec?.clipboardText(runtime.reference())).toBe('@Researcher')
   const body = runtime.fetcher.mock.calls[1]?.[1]?.body
   expect(typeof body).toBe('string')
   if (typeof body !== 'string') throw new Error('Missing body')
