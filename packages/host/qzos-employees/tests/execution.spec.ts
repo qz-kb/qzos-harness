@@ -225,3 +225,17 @@ it('searches explicit knowledge ids without an employee binding', async () => {
     expect(calls[0]).toMatchObject({ action: 'retrieve', body: { knowledge_ids: [29, 26], question: '仓储客户降本' } })
   } finally { await ctx.fiber.dispose(); vi.unstubAllGlobals() }
 })
+
+it('explains a server that rejects explicit knowledge ids', async () => {
+  const ctx = new Context(), auth = { userId: '1', token: 'synthetic' }
+  vi.stubGlobal('fetch', async () => Response.json({
+    code: 0, msg: 'DSH 接入请求未完成', data: { error_code: 'DSH_REQUEST_INVALID' },
+  }))
+  try {
+    await ctx.plugin(Storage); ctx.storage.backend.register('memory', new MemoryStorageBackend())
+    ctx.provide('storageDomain', new DomainFacility(ctx, { backend: 'memory', routes: {} }))
+    const bridge = await execution(ctx, { apiUrl: 'http://qzos.invalid/api', requestTimeoutMs: 1000 }, 's'.repeat(32), () => auth, () => undefined)
+    await expect(bridge.searchKnowledge(auth, SessionId('knowledge-session'), [29], '仓储降本', new AbortController().signal))
+      .rejects.toThrow('尚未启用普通会话知识库检索')
+  } finally { await ctx.fiber.dispose(); vi.unstubAllGlobals() }
+})

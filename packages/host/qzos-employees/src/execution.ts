@@ -160,9 +160,16 @@ export async function execution(
   const searchKnowledge = async (auth: Credential, session: SessionId, knowledgeIds: readonly number[], question: string, signal: AbortSignal): Promise<unknown> => {
     await drain(auth)
     const turn = turns.get(session)?.turn ?? 0
-    return retrieveRequest(auth, {
-      call_id: randomUUID(), session_id: session, turn_id: String(turn), question, knowledge_ids: knowledgeIds,
-    }, signal)
+    try {
+      return await retrieveRequest(auth, {
+        call_id: randomUUID(), session_id: session, turn_id: String(turn), question, knowledge_ids: knowledgeIds,
+      }, signal)
+    } catch (error) {
+      if (error instanceof ReceiptRefused && error.code === 'DSH_REQUEST_INVALID') {
+        throw new Error('QZOS 服务端尚未启用普通会话知识库检索（knowledge_ids）')
+      }
+      throw error
+    }
   }
   const attach = (agent: Agent) => {
     if (attached.has(agent)) return
