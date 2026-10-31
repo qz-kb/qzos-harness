@@ -1,0 +1,10 @@
+# Private business composition, applied after the upstream Web and preset layers.
+# Deployment overlays retain the stable row IDs and replace endpoint/owner configuration.
+- insert:
+    - id: ui-qzos
+      name: '@deepseek-ai/dsh-client-ui-qzos'
+    - id: qzos-employees
+      name: '@deepseek-ai/dsh-qzos-employees'
+      config:
+        apiUrl: http://127.0.0.1:3082/api
+        requestTimeoutMs: 60000

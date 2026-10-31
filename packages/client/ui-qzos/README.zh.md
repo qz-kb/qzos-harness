@@ -21,7 +21,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用方式
 
-Web bundle 挂载 `ui-qzos`，移除这一行即可恢复上游呈现。按根目录 `.node-version` 使用 Node，执行 `pnpm run dev:web --patch apps/web/tests/pin-browse-picker.overlay.yml --port 3081`；启动器参数须放在 Web 参数之前。
+Web bundle 在上游与预设配置层之后声明私有 `packages/bundle/web-app/qzos.patch.yml`。此文件挂载 `ui-qzos` 和 `qzos-employees`；部署覆盖层沿相同的稳定行 ID 修改配置。上游 `cordis.patch.yml` 不包含 QZOS 行，移除私有层即可恢复上游组合。按根目录 `.node-version` 使用 Node，执行 `pnpm run dev:web --patch apps/web/tests/pin-browse-picker.overlay.yml --port 3081`；启动器参数须放在 Web 参数之前。
 
 QZOS 侧栏名称以插槽优先级 `-10` 覆盖正式构建的默认名称。两个插件可以同时挂载；移除 QZOS 后恢复上游名称。真实浏览器用例 `apps/web/tests/qzos-brand.e2e.ts` 覆盖启动、移除和重新挂载，并已在正式构建配置下验证。
 

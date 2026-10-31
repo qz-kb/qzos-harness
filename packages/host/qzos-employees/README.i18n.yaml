@@ -15,11 +15,11 @@
   en: 85088fb0789b65e3
   zh: d1b42f20f374a40d
 /qzos-employee-host-adapter/contract:
-  en: d7055b9883dcbcc3
-  zh: 7d7813151358acab
+  en: 6ae44116e15a0881
+  zh: 2354f780dc8e628a
 /qzos-employee-host-adapter/optional-execution-adapter:
-  en: 2129075ade0559fe
-  zh: ed26b2610870e362
+  en: b04314dba8864f49
+  zh: 4153ec59a920d598
 /qzos-employee-host-adapter/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -27,8 +27,8 @@
   en: bee2343a93669493
   zh: a5d49aed6839ba70
 /qzos-employee-host-adapter/model-experience/employee-knowledge/what-the-model-sees:
-  en: c27aa4d01867bf6f
-  zh: 3b06d7a00637de75
+  en: 57da660ac03934ef
+  zh: 4dc8d0743105a214
 /qzos-employee-host-adapter/model-experience/employee-knowledge/token-effect:
   en: c0f78ae87ea1fa5f
   zh: 31dffcd4b5d4f8c9

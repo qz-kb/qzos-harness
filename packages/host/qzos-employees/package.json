@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-qzos-employees",
-  "version": "0.2.1-rc.3",
+  "version": "0.2.1-rc.5",
   "private": true,
   "type": "module",
   "main": "lib/index.js",
